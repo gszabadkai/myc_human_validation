@@ -1,0 +1,16 @@
+# Large downloads and generated artefacts - not on origin, back up data/raw/ separately
+data/raw/*
+!data/raw/.gitkeep
+results/*
+!results/.gitkeep
+outputs/*
+!outputs/.gitkeep
+
+# R session cruft
+.Rhistory
+.RData
+.Rproj.user/
+
+# macOS / Drive litter (insurance; should not occur outside Drive)
+.DS_Store
+Icon?
