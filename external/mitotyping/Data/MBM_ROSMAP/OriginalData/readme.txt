@@ -1,0 +1,3 @@
+MitoBrainMap single nuclei RNA sequencing data is available from http://humanmitobrainmap.bcblab.com. The clean data from Mosharov et al. 2025 is available as rds file via dropbox (https://www.dropbox.com/scl/fo/isxnpipvw1t2bdxwy8ihb/AHOljqrqR0mfSoF8feanOrk?rlkey=br09cxwqg8c3igj3p4jauurtg&st=q5u94h50&dl=0)
+
+ROSMAP data can be accessed via the data portal https://adknowledgeportal.synapse.org/Data%20Access

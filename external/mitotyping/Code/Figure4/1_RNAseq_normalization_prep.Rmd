@@ -1,0 +1,362 @@
+---
+title: "Fibroblast data normalization"
+date: "2024-09-04"
+output:
+  html_document:
+    theme: united
+    df_print: kable
+    code_folding: hide
+    toc: no
+    number_sections: no
+  pdf_document:
+    toc: no
+---
+
+```{r setup, include=FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+# Preparation / QC
+
+Important note: the following (commented) code is for the local data exported from kallisto as I ran the entire analysis from scratch. To use the data from the GEO datasets, use code below (GEO data preparation).
+
+```{r}
+rm(list = ls())
+data_dir <- here::here("Data", "Fibroblasts", "ProcessedData")
+library(limma)
+library(Glimma)
+library(edgeR)
+library(tidyverse)
+library(tximport)
+library(DESeq2)
+library(RColorBrewer)
+genewizDir <- "/Users/annamonzel/Library/CloudStorage/GoogleDrive-asm2285@cumc.columbia.edu/.shortcut-targets-by-id/1pUjuYVHpRn5G2HeHNW2X0DBAVzvL-vMa/MitoLab - General/ Members Folders/Gabriel Sturm/Projects/Project 2- Cell Lifespan Aging/RNA/RNAseq/Genewiz/"
+
+# Get metadata and samples included in analysis
+samples <- read_csv(here::here("Data", "Fibroblasts", "OriginalData", "RNAseq_meta.csv")) %>%
+  mutate(tmp = "Sample_") %>%
+  unite(RNAseq_sampleID, tmp, RNAseq_sampleID, sep = "") %>%
+  as.data.frame() %>%
+  dplyr::select(RNAseq_sampleID, Cell_line_group, Clinical_condition, Treatments, Percent_oxygen, Unique_variable_name)  %>%
+  separate(RNAseq_sampleID, into = c("Sample", "ID"), remove = F) %>%
+  mutate(ID = as.numeric(ID))
+
+samples_all <- read_csv(here::here("Data", "Fibroblasts", "OriginalData", "RNAseq_meta.csv"))
+length(unique(samples_all$Cell_line_inhouse))
+max(na.omit(samples_all$Passage))
+```
+
+## Tximport
+
+```{r}
+
+samples_to_read <- sort(as.numeric(samples$ID))
+files <- file.path(genewizDir, 'kallisto_output_newv3', samples_to_read, "abundance.tsv")
+names(files) <- paste0("Sample_", samples_to_read)
+x = read.csv(here::here(genewizDir, 'kallisto_output_newv3/1/abundance.tsv'),sep='\t',header=T)
+
+## summarize only across coding RNAs
+mRNA <- x$target_id[which(grepl("mRNA", x$target_id)==TRUE)]
+mtRNA <- x$target_id[which(grepl("CDS", x$target_id)==TRUE)]
+mRNA_genes = sapply(lapply(strsplit(as.character(mRNA), '\\;'), 'rev'), '[', 2)
+mtRNA_genes = sapply(lapply(strsplit(as.character(mtRNA), '\\;'), 'rev'), '[', 2)
+tx2gene = data.frame(target_id = as.character(c(mRNA, mtRNA)), gene = c(mRNA_genes, mtRNA_genes))
+
+## Important: order samples in counts dataset in the same order they are in the metadata (samples)
+txi <- tximport(files, type = "kallisto",tx2gene=tx2gene, countsFromAbundance = "no")
+gene_counts <- txi$counts[,samples$RNAseq_sampleID]
+gene_abundances <- txi$abundance[,samples$RNAseq_sampleID]
+gene_lengths <- txi$length[,samples$RNAseq_sampleID]
+
+txi.tx <- tximport(files, type = "kallisto",tx2gene=tx2gene, txOut = TRUE) #countsFromAbundance = "lengthScaledTPM",
+transcript_counts <- txi.tx$counts[,samples$RNAseq_sampleID]
+transcript_abundances <- txi.tx$abundance[,samples$RNAseq_sampleID]
+transcript_lengths <- txi.tx$length[,samples$RNAseq_sampleID]
+
+dim(gene_counts)
+dim(transcript_counts)
+
+```
+
+## QC
+
+```{r}
+for_viz <- as.data.frame(transcript_counts) %>%
+  rownames_to_column("Genes") %>%
+  separate(Genes, into = c("REFSEQ1", "REFSEQ2", "SYMBOL", "TYPE"), sep = ";")  %>%
+  pivot_longer(cols = -c("REFSEQ1", "REFSEQ2", "SYMBOL", "TYPE"), names_to = "RNAseq_sampleID", values_to = "exprs") %>%
+  full_join(samples, by = "RNAseq_sampleID") %>%
+  group_by(TYPE, RNAseq_sampleID) %>%
+  mutate(mean = mean(exprs)) %>%
+  ungroup() %>%
+  dplyr::select(TYPE, RNAseq_sampleID, mean) %>%
+  unique()
+
+for_viz %>%
+  ggplot(aes(x = reorder(RNAseq_sampleID, mean), y = mean)) +
+  geom_col(mapping = NULL) +
+  facet_wrap(~TYPE, scales = "free") +
+  theme(legend.position = "none")
+rm(samples_to_read, files,  for_viz,  x, tx2gene)
+```
+
+
+
+
+
+## Visualize library size 
+
+```{r}
+x <- DGEList(counts = gene_counts,
+             samples = samples,
+             group = samples$Cell_line_group
+             )
+plotly::ggplotly(x$samples %>%
+  rownames_to_column("sample") %>%
+  unite(Condition, Clinical_condition, Treatments) %>%
+  ggplot(aes(x = reorder(sample, lib.size), y = lib.size, fill = Condition, label = Cell_line_group)) +
+  geom_bar(stat = "identity") +
+  labs(y = "Library size (total number of mapped and quantified reads)",
+       x = "Sample", fill = "Group") +
+  coord_flip())
+```
+
+# nTPM normalization (for mitotyping)
+https://www.nature.com/articles/s41467-023-41132-w
+
+```{r}
+# rm(list = setdiff(ls(), c("samples", "genewizDir", "data_dir")))
+# samples_to_read <- sort(as.numeric(samples$ID))
+# files <- file.path(genewizDir, 'kallisto_output_newv3', samples_to_read, "abundance.tsv")
+# names(files) <- paste0("Sample_", samples_to_read)
+# x = read.csv(here::here(genewizDir, 'kallisto_output_newv3/1/abundance.tsv'),sep='\t',header=T)
+# ## summarize only across coding RNAs
+# mRNA <- x$target_id[which(grepl("mRNA", x$target_id)==TRUE)]
+# mtRNA <- x$target_id[which(grepl("CDS", x$target_id)==TRUE)]
+# mRNA_genes = sapply(lapply(strsplit(as.character(mRNA), '\\;'), 'rev'), '[', 2)
+# mtRNA_genes = sapply(lapply(strsplit(as.character(mtRNA), '\\;'), 'rev'), '[', 2)
+# tx2gene = data.frame(target_id = as.character(c(mRNA, mtRNA)), gene = c(mRNA_genes, mtRNA_genes))
+# 
+# txi <- tximport(files, type = "kallisto",tx2gene=tx2gene, countsFromAbundance = "lengthScaledTPM")
+# gene_counts <- txi$counts[,samples$RNAseq_sampleID]
+# gene_abundances <- txi$abundance[,samples$RNAseq_sampleID]
+# gene_lengths <- txi$length[,samples$RNAseq_sampleID]
+# 
+# 
+# sapply(as.data.frame(gene_counts), sum)
+# pTPM <- cpm(gene_counts)
+# sapply(as.data.frame(pTPM), sum)
+# #saveRDS(pTPM,  here::here(data_save_dir,"pTPM_Lifespan.rds"))
+# 
+# ref.samples <- samples %>%
+#   filter(Clinical_condition %in% "Normal") %>%
+#   filter(Treatments %in% "Control") %>%
+#   filter(Percent_oxygen %in% "21") %>%
+#   pull(RNAseq_sampleID)
+# ref.column <- data.frame(Median = rowMedians(pTPM[,ref.samples]))
+# rownames(ref.column) = rownames(pTPM)
+# pTPM <- bind_cols(ref.column, pTPM)
+# 
+# nTPM <- NOISeq::tmm(pTPM, refColumn = "Median")
+# sapply(as.data.frame(nTPM), sum)
+# nTPM <- nTPM[,-1]
+# 
+# saveRDS(nTPM,  here::here(data_dir,"nTPM_Lifespan.rds"))
+# rm(list = setdiff(ls(), c("nTPM","keep.exprs", "samples", "genewizDir", "data_dir")))
+```
+
+
+
+
+
+
+# Mitotyping preparation
+
+## Mitogenes found in data 
+
+Note: mtDNA genes in Mitocarta are "MT-XXX" and only "XXX" in kallisto.
+(changed here to match)
+
+
+```{r}
+# genes_found <- rownames(nTPM)
+# 
+# mitogenes <- readxl::read_xls(here::here("Data", "MitoCarta","OriginalData", "HumanMitoCarta3_0.xls"), sheet = 2) %>%
+#   pull(Symbol)
+# mitogenes_mt <- mitogenes[grepl("MT-", mitogenes)]
+# mitogenes_mt <- str_remove(mitogenes_mt, "MT-")
+# mitogenes <- mitogenes[!grepl("MT-", mitogenes)]
+# mitogenes <- c(mitogenes, mitogenes_mt)
+# 
+# genes_found_mt <- unique(sort(genes_found[which(genes_found %in% mitogenes)]))
+# length(genes_found_mt)
+
+```
+
+
+The following genes were not found
+
+```{r}
+# mitogenes[which(!mitogenes%in% genes_found_mt)]
+```
+
+Note: MT-CO1, MT-CO2 and MT-CO3 are differently annotated in kallisto.
+Here are all mtDNA genes as annotated in Kallisto:
+
+```{r}
+
+# samples_to_read <- sort(as.numeric(samples$ID))
+# files <- file.path(genewizDir, 'kallisto_output_newv3', samples_to_read, "abundance.tsv")
+# names(files) <- paste0("Sample_", samples_to_read)
+# x = read.csv(here::here(genewizDir, 'kallisto_output_newv3/1/abundance.tsv'),sep='\t',header=T)
+# 
+# ## summarize only across coding RNAs
+# mRNA <- x$target_id[which(grepl("mRNA", x$target_id)==TRUE)]
+# mtRNA <- x$target_id[which(grepl("CDS", x$target_id)==TRUE)]
+# mRNA_genes = sapply(lapply(strsplit(as.character(mRNA), '\\;'), 'rev'), '[', 2)
+# mtRNA_genes = sapply(lapply(strsplit(as.character(mtRNA), '\\;'), 'rev'), '[', 2)
+# tx2gene = data.frame(target_id = as.character(c(mRNA, mtRNA)), gene = c(mRNA_genes, mtRNA_genes))
+# 
+# ## Important: order samples in counts dataset in the same order they are in the metadata (samples)
+# txi <- tximport(files, type = "kallisto",tx2gene=tx2gene, countsFromAbundance = "no")
+# gene_counts <- txi$counts[,samples$RNAseq_sampleID]
+# gene_abundances <- txi$abundance[,samples$RNAseq_sampleID]
+# gene_lengths <- txi$length[,samples$RNAseq_sampleID]
+# 
+# txi.tx <- tximport(files, type = "kallisto",tx2gene=tx2gene, txOut = TRUE)
+# transcript_counts <- txi.tx$counts[,samples$RNAseq_sampleID]
+# transcript_abundances <- txi.tx$abundance[,samples$RNAseq_sampleID]
+# transcript_lengths <- txi.tx$length[,samples$RNAseq_sampleID]
+# 
+# 
+# mtDNAgenes_in_data <- as.data.frame(transcript_counts) %>%
+#   rownames_to_column("Genes") %>%
+#   separate(Genes, into = c("REFSEQ1", "REFSEQ2", "SYMBOL", "TYPE"), sep = ";") %>%
+#   filter(TYPE %in% "CDS") %>% unique()
+# mtDNAgenes_in_data$SYMBOL
+```
+
+This has to be changed in downstream analyses, but kept for now. I just search by mitogenes + CDS annotation in kallisto.
+The other two genes not found are MYG1, also known as C12orf10, and RP11_469A15.2, which is a Long intergenic non-coding RNA (lincRNA). C12orf10 could be found, but RP11_469A15.2 was excluded (only mtDNA-RNA and mRNA kept)
+
+```{r}
+# genes_found <- rownames(nTPM)
+# genes_found_mt <- unique(sort(genes_found[which(genes_found %in% c(mitogenes, mtDNAgenes_in_data$SYMBOL, "C12orf10"))]))
+# length(genes_found_mt)
+# rm(genes_found, genes_found_mt, mtDNAgenes_in_data, mitogenes, mitogenes_mt)
+```
+
+
+# GEO data preparation
+
+Run this if you downloaded the data from GEO. Note that the data on GEO was prepared by Sturm et al. 2022, with different R software and package versions. It might not 100% match the data prepared using the code above (kallisto, tximport). This does not affect the figures overall, but some statistics might differ slightly (e.g. the PCA variances). The raw data that was used above can be shared upon request. 
+
+```{r}
+
+
+gene_counts <- read_csv(here::here("Data/Fibroblasts/OriginalData", "GSE179848_txi_gene_count_lengthScaledTPM.csv")) %>%
+  pivot_longer(cols = -`...1`) %>%
+  separate(name, into = c("Sample", "Type"), sep = "_") %>%
+  select(-Type) %>%
+  mutate(Sample2 = "Sample") %>%
+  unite(Sample, Sample2, Sample, sep = "_") %>%
+  pivot_wider(names_from = Sample, values_from = value) %>%
+  column_to_rownames("...1")
+
+
+samples <- read_csv(here::here("Data", "Fibroblasts", "OriginalData", "RNAseq_meta.csv")) %>%
+  mutate(tmp = "Sample_") %>%
+  unite(RNAseq_sampleID, tmp, RNAseq_sampleID, sep = "") %>%
+  as.data.frame() %>%
+  dplyr::select(RNAseq_sampleID, Cell_line_group, Clinical_condition, Treatments, Percent_oxygen, Unique_variable_name)  %>%
+  separate(RNAseq_sampleID, into = c("Sample", "ID"), remove = F) %>%
+  mutate(ID = as.numeric(ID))
+
+sapply(as.data.frame(gene_counts), sum)
+pTPM <- cpm(gene_counts)
+sapply(as.data.frame(pTPM), sum)
+#saveRDS(pTPM,  here::here(data_save_dir,"pTPM_Lifespan.rds"))
+
+ref.samples <- samples %>%
+  dplyr::filter(Clinical_condition %in% "Normal") %>%
+  dplyr::filter(Treatments %in% "Control") %>%
+  dplyr::filter(Percent_oxygen %in% "21") %>%
+  pull(RNAseq_sampleID)
+
+ref.column <- data.frame(Median = rowMedians(pTPM[,ref.samples]))
+rownames(ref.column) = rownames(pTPM)
+pTPM <- bind_cols(ref.column, pTPM)
+
+nTPM <- NOISeq::tmm(pTPM, refColumn = "Median")
+sapply(as.data.frame(nTPM), sum)
+nTPM <- nTPM[,-1]
+saveRDS(nTPM, here::here("Data/Fibroblasts/ProcessedData", "nTPM_Lifespan.rds"))
+
+```
+
+# Filter mitogenes in nTPM data
+
+```{r}
+
+data_nTPM <- nTPM %>%
+  as.data.frame() %>%
+  rownames_to_column("Gene") %>%
+  pivot_longer(cols = -Gene, names_to = "RNAseq_sampleID", values_to = "nTPM") 
+
+mitocarta <- readxl::read_xls(here::here("Data", "MitoCarta", "OriginalData",
+                                         "HumanMitoCarta3_0.xls"), sheet = 4) %>%
+  select(MitoPathway, Genes) %>%
+  na.omit()
+gene_to_pathway <- splitstackshape::cSplit(mitocarta, 'Genes', ',') %>%
+  column_to_rownames("MitoPathway") %>%
+  t() %>%
+  as.data.frame()
+gene_to_pathway <- gene_to_pathway %>%
+  pivot_longer(cols = colnames(gene_to_pathway), names_to = "Pathway", values_to = "Gene") %>%
+  na.omit()
+
+## Mitogenes in data 
+mitocarta <- readxl::read_xls(here::here("Data", "MitoCarta", "OriginalData","HumanMitoCarta3_0.xls"), sheet = 2)
+mitogenes <- mitocarta$Symbol
+all_genes <- unique(data_nTPM$Gene)
+mitogenes_in_data <- sort(mitogenes[which(mitogenes %in% all_genes)])
+length(mitogenes_in_data)
+mitogenes_not_in_data <- mitogenes[which(!mitogenes %in% mitogenes_in_data)]
+mitogenes_not_in_data
+manual_mitogene_pull <- c("ND1", "ATP6", "COX2", "COX1", "ND2", "ND4", "ND5", "CYTB", "ATP8", "COX3", "ND3", "ND4L", "C12orf10", "ND6", "RP11_469A15.2")
+all_mitogenes_in_data <- c(mitogenes[which(!mitogenes %in% mitogenes_not_in_data)], manual_mitogene_pull[which(!manual_mitogene_pull %in% "RP11_469A15.2")])
+data_mito <- data_nTPM %>%
+  filter(Gene %in% all_mitogenes_in_data ) %>%
+  mutate(Gene = case_when(
+    # renaming to match with mitocarta
+    Gene == "C12orf10" ~ "MYG1", 
+    Gene == "ND1" ~ "MT-ND1",  
+    Gene == "ND2" ~ "MT-ND2", 
+    Gene == "COX1" ~ "MT-CO1",
+    Gene == "COX2" ~ "MT-CO2",
+    Gene == "ATP8" ~ "MT-ATP8", 
+    Gene == "ATP6" ~ "MT-ATP6", 
+    Gene == "COX3" ~ "MT-CO3",
+    Gene == "ND3" ~ "MT-ND3",  
+    Gene == "ND4L" ~ "MT-ND4L", 
+    Gene == "ND4" ~ "MT-ND4", 
+    Gene == "ND5" ~ "MT-ND5", 
+    Gene == "ND6" ~ "MT-ND6", 
+    Gene == "CYTB" ~ "MT-CYB",
+    TRUE ~ Gene
+  )) %>%
+  mutate(Genome = case_when(
+    grepl("MT-", Gene) ~ "mtDNA",
+    TRUE~"NucDNA"
+  )) 
+
+write_csv(data_mito, here::here("Data","Fibroblasts", "ProcessedData", "RNAseqData_MitoGenes.csv"))
+
+
+```
+
+
+
+
+
+

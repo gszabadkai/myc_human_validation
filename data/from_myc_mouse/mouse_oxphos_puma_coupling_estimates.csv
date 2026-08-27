@@ -1,0 +1,11 @@
+source_script,axis,ruler,quantity,value,p_value,p_empirical,ambient,resid_frac,source_doc,source_line
+43_substrate_specificity_and_tradeoff.R,OXPHOS subunits,mitoPPS,slope_wild_type,-4.80,NA,NA,NA,NA,figures/panels/PANELS.md,1211
+43_substrate_specificity_and_tradeoff.R,OXPHOS subunits,mitoPPS,slope_myc_pos,4.35,NA,NA,NA,NA,figures/panels/PANELS.md,1211
+43_substrate_specificity_and_tradeoff.R,OXPHOS subunits,mitoPPS,interaction,6.09,0.0052,0.083,NA,NA,figures/panels/PANELS.md,1211
+43_substrate_specificity_and_tradeoff.R,redox,mitoPPS,slope_wild_type,-7.70,NA,NA,NA,NA,figures/panels/PANELS.md,1211
+43_substrate_specificity_and_tradeoff.R,redox,mitoPPS,slope_myc_pos,-6.72,NA,NA,NA,NA,figures/panels/PANELS.md,1211
+43_substrate_specificity_and_tradeoff.R,redox,mitoPPS,interaction,2.16,0.72,NA,NA,NA,figures/panels/PANELS.md,1211
+46_axis_ruler_test.R,oxphos_ppd,mitoPPS,interaction_beta,0.779,0.0052,0.080,0.49,0.550,docs/2026-08-17_instrument_choice_for_the_reduced_figure_set.md,250
+46_axis_ruler_test.R,oxphos_lvl,levels,interaction_beta,0.535,0.156,0.154,0.81,0.071,docs/2026-08-17_instrument_choice_for_the_reduced_figure_set.md,250
+46_axis_ruler_test.R,redox_ppd,mitoPPS,interaction_beta,0.207,0.72,0.486,0.26,0.998,docs/2026-08-17_instrument_choice_for_the_reduced_figure_set.md,250
+46_axis_ruler_test.R,redox_lvl,levels,interaction_beta,0.362,0.353,0.229,0.72,0.207,docs/2026-08-17_instrument_choice_for_the_reduced_figure_set.md,250
