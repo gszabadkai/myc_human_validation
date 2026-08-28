@@ -94,9 +94,9 @@ if (!file.exists(PATH_XENA)) {
 if (file.exists(PATH_SE)) {
   message("1. cached counts matrix found, skipping rebuild")
   cached <- readRDS(PATH_SE)
-  counts_raw <- cached$counts
-  gene_ann   <- cached$annotation
-  attr(counts_raw, "averaged_col") <- cached$averaged_col
+  counts_raw   <- cached$counts
+  gene_ann     <- cached$annotation
+  averaged_col <- cached$averaged_col
 } else {
   message("1. reading Xena STAR counts matrix (138 MB, log2 scale on disk)")
   xz <- data.table::fread(cmd = paste("gzip -dc", shQuote(PATH_XENA)),
@@ -125,15 +125,15 @@ if (file.exists(PATH_SE)) {
   lin <- 2^xm - 1
   frac <- abs(lin - round(lin))
 
-  averaged_col <- apply(frac, 2L, function(v) any(v > 0.25, na.rm = TRUE))
-  if (any(averaged_col)) {
-    message("   ", sum(averaged_col), " column(s) contain half-integer values, ",
+  avg_flag <- apply(frac, 2L, function(v) any(v > 0.25, na.rm = TRUE))
+  if (any(avg_flag)) {
+    message("   ", sum(avg_flag), " column(s) contain half-integer values, ",
             "i.e. Xena aliquot averages, and are flagged:")
-    for (nm in colnames(lin)[averaged_col]) message("     ", nm)
+    for (nm in colnames(lin)[avg_flag]) message("     ", nm)
   }
   # Any residual non-integrality OUTSIDE those columns would mean the values are
   # not log2(raw count + 1) at all, and that is fatal.
-  resid <- max(frac[, !averaged_col, drop = FALSE], na.rm = TRUE)
+  resid <- max(frac[, !avg_flag, drop = FALSE], na.rm = TRUE)
   message(sprintf("   max deviation outside those columns: %.3e", resid))
   if (resid > 1e-3) {
     stop("log2 inversion is not returning integers even outside the averaged ",
@@ -144,7 +144,11 @@ if (file.exists(PATH_SE)) {
 
   counts_raw <- round(lin)
   storage.mode(counts_raw) <- "integer"
-  attr(counts_raw, "averaged_col") <- colnames(lin)[averaged_col]
+  # Held as a PLAIN VARIABLE, not an attribute on the matrix. Attributes are
+  # silently dropped by `m[rows, ]`, and the row-alignment step below does
+  # exactly that - which on the first run left this empty and let all five
+  # averaged columns through into the output.
+  averaged_col <- colnames(lin)[avg_flag]
   rm(xz, xm, lin, frac); invisible(gc())
 
   # --- annotation from a local GDC file, GENCODE v36 ------------------------
@@ -163,7 +167,7 @@ if (file.exists(PATH_SE)) {
           nrow(gene_ann), " genes (GENCODE v36)")
 
   saveRDS(list(counts = counts_raw, annotation = gene_ann,
-               averaged_col = attr(counts_raw, "averaged_col"),
+               averaged_col = averaged_col,
                source = "UCSC Xena GDC hub, TCGA-BRCA.star_counts.tsv.gz",
                sha256 = XENA_SHA256, built = Sys.time()), PATH_SE)
   message("   cached to ", PATH_SE)
@@ -217,7 +221,16 @@ vial <- substr(vapply(strsplit(bc, "-"), `[`, character(1), 4), 3, 3)
 message("\n2. sample types present: ",
         paste(sprintf("%s=%d", names(table(sty)), table(sty)), collapse = " "))
 
-averaged <- colnames(counts_raw) %in% attr(counts_raw, "averaged_col")
+stopifnot(exists("averaged_col"))
+averaged <- colnames(counts_raw) %in% averaged_col
+# Guard against the failure this rule exists to prevent: if the flag list is
+# non-empty but nothing matches, the list has been lost somewhere upstream and
+# the averaged columns would sail through unnoticed.
+if (length(averaged_col) > 0L && !any(averaged)) {
+  stop(length(averaged_col), " averaged column(s) were flagged in section 1 but ",
+       "none match the matrix columns. The flag list has been lost - do not ",
+       "proceed, the averaged aliquots would be selected silently.", call. = FALSE)
+}
 
 keep       <- which(sty == "01")
 counts_raw <- counts_raw[, keep, drop = FALSE]
