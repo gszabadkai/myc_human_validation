@@ -69,13 +69,20 @@ PATH_G1CORR  <- file.path(DIR_RESULTS, "g1_correlation_criterion.rds")
 #
 # If the API route keeps failing on truncated chunks, the robust alternative is
 # the GDC Data Transfer Tool: install gdc-client, then add method = "client".
-.fetch_gdc <- function(query, dest, per_chunk, timeout_s) {
+.fetch_gdc <- function(query, dest, per_chunk, timeout_s, method) {
   old_wd <- setwd(dest)                    # setwd() returns the PREVIOUS wd
   on.exit(setwd(old_wd), add = TRUE)
   old_to <- options(timeout = timeout_s)
   on.exit(options(old_to), add = TRUE)
-  TCGAbiolinks::GDCdownload(query, directory = "GDCdata",
-                            files.per.chunk = per_chunk)
+  if (identical(method, "client")) {
+    # gdc-client fetches files individually in parallel and retries per file,
+    # so one bad stream costs one 4 MB file rather than a whole chunk.
+    # files.per.chunk does not apply to this route.
+    TCGAbiolinks::GDCdownload(query, directory = "GDCdata", method = "client")
+  } else {
+    TCGAbiolinks::GDCdownload(query, directory = "GDCdata", method = "api",
+                              files.per.chunk = per_chunk)
+  }
   TCGAbiolinks::GDCprepare(query, directory = "GDCdata")
 }
 
@@ -95,18 +102,35 @@ GDC_FILES_PER_CHUNK <- 50L
 # Set generously - this is a ceiling, not a delay.
 GDC_TIMEOUT_SECONDS <- 14400L   # 4 hours
 
+# Route. "client" uses the GDC Data Transfer Tool: parallel per-file downloads
+# with per-file retry, so a bad stream costs one 4 MB file instead of a chunk.
+# It is preferred when available and the script falls back to the API route
+# otherwise, so a fresh checkout without the tool still works.
+#
+# gdc-client is NOT in Homebrew, despite what a search suggests. Install the
+# binary from NCI:
+#   https://gdc.cancer.gov/access-data/gdc-data-transfer-tool
+# Apple Silicon build (v2.3.0, verified working here):
+#   gdc-client_2.3_OSX_x64-py3.8-macos-14.zip
+#   -> unzip twice (it is a zip inside a zip), chmod +x, put on PATH
+GDC_METHOD <- if (nzchar(Sys.which("gdc-client"))) "client" else "api"
+
 if (file.exists(PATH_SE)) {
   message("1. cached SummarizedExperiment found, skipping download")
   se <- readRDS(PATH_SE)
 } else {
   message("1. querying GDC (~5.2 GB over ~1231 files; resumable, runs once)")
+  message("   route: ", GDC_METHOD,
+          if (GDC_METHOD == "client") "  (gdc-client found on PATH)"
+          else "  (gdc-client not found; install it for a faster, more robust fetch)")
   q <- TCGAbiolinks::GDCquery(
     project       = "TCGA-BRCA",
     data.category = "Transcriptome Profiling",
     data.type     = "Gene Expression Quantification",
     workflow.type = "STAR - Counts"
   )
-  se <- .fetch_gdc(q, DIR_TCGA_RAW, GDC_FILES_PER_CHUNK, GDC_TIMEOUT_SECONDS)
+  se <- .fetch_gdc(q, DIR_TCGA_RAW, GDC_FILES_PER_CHUNK, GDC_TIMEOUT_SECONDS,
+                   GDC_METHOD)
   saveRDS(se, PATH_SE)
   message("   cached to ", PATH_SE)
 }
