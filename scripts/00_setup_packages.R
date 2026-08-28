@@ -109,6 +109,11 @@ PATH_GISTIC_FH_TAR <- file.path(
 PATH_GISTIC_FH_TXT <- file.path(DIR_GISTIC_RAW, "firehose",
                                 "all_thresholded.by_genes.txt")
 
+# PanCanAtlas genomics and protein, script 02. All single files with recorded
+# SHA-256; provenance in data/tcga_pancanatlas/README.md. Under data/raw/,
+# gitignored, not on origin.
+DIR_PANCANATLAS <- here::here("data", "raw", "tcga_pancanatlas")
+
 PATH_GDC_BRCA_CASES <- here::here("data", "tcga_clinical",
                                   "gdc_brca_cases_2026-08-28.tsv")
 PATH_TCGA_CLINICAL  <- here::here("data", "tcga_clinical",
