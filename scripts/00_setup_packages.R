@@ -23,7 +23,7 @@
 )
 
 .pkg_analysis <- c(
-  "GSVA", "DESeq2", "limma", "decoupleR", "msigdbr", "survival"
+  "GSVA", "DESeq2", "limma", "decoupleR", "msigdbr", "survival", "data.table"
 )
 
 # Needed by scripts 01 and 02 only. Recorded, not fatal here: gates G1 and G2
@@ -92,6 +92,27 @@ PATH_COLLECTRI <- here::here("data", "collectri_human",
 PATH_FELSHER   <- here::here("data", "genesets_from_library_human",
                              "felsher_integrative_signature.csv")
 
+# G2 copy-number inputs. The two GISTIC files are large and live under
+# data/raw/, which is gitignored and NOT on origin. Provenance, URLs and
+# SHA-256 sums are in data/gistic_tcga_brca/README.md; re-download from there
+# rather than hunting for a backup.
+DIR_GISTIC_RAW <- here::here("data", "raw", "gistic_tcga_brca")
+
+PATH_GISTIC_ISAR <- file.path(DIR_GISTIC_RAW,
+                              "ISAR_GISTIC.all_thresholded.by_genes.txt.gz")
+PATH_GISTIC_FH_TAR <- file.path(
+  DIR_GISTIC_RAW,
+  "gdac.broadinstitute.org_BRCA-TP.CopyNumber_Gistic2.Level_4.2016012800.0.0.tar.gz"
+)
+# Extracted from the tarball on first use by script 05.
+PATH_GISTIC_FH_TXT <- file.path(DIR_GISTIC_RAW, "firehose",
+                                "all_thresholded.by_genes.txt")
+
+PATH_GDC_BRCA_CASES <- here::here("data", "tcga_clinical",
+                                  "gdc_brca_cases_2026-08-28.tsv")
+PATH_TCGA_CLINICAL  <- here::here("data", "tcga_clinical",
+                                  "tcga_brca_clinical_snapshot_2026-08-28.tsv")
+
 .ensure_dir <- function(p) {
   if (!dir.exists(p)) dir.create(p, recursive = TRUE, showWarnings = FALSE)
   invisible(p)
@@ -121,6 +142,63 @@ EXPECT_COLLECTRI_TFS      <- 1201L
 # serve as the primary MYC estimator (D2) and CollecTRI + the 8q24 CNV
 # instrument carry the MYC axis instead.
 G1_MIN_SIGNATURE_SIZE <- 50L
+
+# --- G2 shape expectations ---------------------------------------------------
+EXPECT_GISTIC_ISAR_GENES   <- 24203L
+EXPECT_GISTIC_ISAR_SAMPLES <- 9991L   # pan-cancer, all 33 TCGA types
+EXPECT_GISTIC_FH_GENES     <- 24776L
+EXPECT_GISTIC_FH_SAMPLES   <- 1080L   # BRCA primary tumours only
+EXPECT_GDC_BRCA_CASES      <- 1098L
+# After the sample rule (GDC case list, then sample type -01, one per patient).
+EXPECT_BRCA_N_ISAR         <- 1043L
+EXPECT_BRCA_N_FH           <- 1080L
+# TNBC rule, see data/tcga_clinical/README.md.
+EXPECT_TNBC_CALLABLE       <- 951L
+EXPECT_TNBC_N              <- 161L
+
+# --- G2 pre-registered thresholds -------------------------------------------
+# Fixed 2026-08-28, see docs/2026-08-28_D4_scoping_and_G2_design.md section 2.3.
+# Gene-specific AND direction-specific. BBC3 is the pro-apoptotic PRIME
+# numerator, so its PRIME-lowering event is LOSS, not gain; MYC/MCL1/BCL2L1 are
+# tested for gain. These are not the same test and must never be described
+# collectively as "co-amplification".
+#
+# BCL2L1 sits at >= +1 rather than +2 because at +2 it is n=28 and
+# uninterpretable, and it is this arm's a priori focus (the PRIME denominator,
+# and the term Lee et al. 2017 never touch).
+# BBC3 sits at <= -1 because homozygous deletion is n=5 and its joint count with
+# MYC amplification is ZERO - that test is empty, not merely underpowered.
+# BAX is the 19q13 REGIONAL CONTROL for BBC3, not a hypothesis.
+G2_THRESHOLDS <- tibble::tribble(
+  ~gene,     ~direction, ~primary_rule, ~role,
+  "MYC",     "gain",     "eq2",         "exposure",
+  "MCL1",    "gain",     "eq2",         "partner_replication",
+  "BCL2L1",  "gain",     "ge1",         "partner_novel",
+  "BBC3",    "loss",     "le_neg1",     "partner_novel",
+  "BAX",     "loss",     "le_neg1",     "regional_control"
+)
+
+# Secondary grid: every gene is additionally reported at the OTHER threshold in
+# its direction's pair, so the sensitivity of the result to that choice is
+# visible. The pairing is keyed on the gene's PRIMARY rule, not on direction --
+# keying it on direction alone silently maps BCL2L1 (primary "ge1") back onto
+# "ge1" and the grid then reports the primary twice.
+G2_ALT_RULE <- c(
+  eq2     = "ge1",       # gain: high-level <-> gain-or-amplification
+  ge1     = "eq2",
+  le_neg1 = "le_neg2",   # loss: any loss <-> homozygous deletion
+  le_neg2 = "le_neg1"
+)
+
+# GUARD: odds ratios computed at different thresholds are NOT comparable across
+# genes. Compare within a threshold only. See design note section 2.3.
+
+# G2 pass criterion, fixed before any statistic was computed (design note 2.8):
+# a partner passes if the ANEUPLOIDY-ADJUSTED odds ratio exceeds 1 with a 95% CI
+# excluding 1, at its primary threshold and direction, in source A (ISAR).
+# Source B must agree in direction; a B disagreement is reported, never
+# overridden.
+G2_ALPHA <- 0.05
 
 # -----------------------------------------------------------------------------
 # Session record

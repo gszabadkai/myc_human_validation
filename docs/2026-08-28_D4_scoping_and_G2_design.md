@@ -1,16 +1,18 @@
 ---
 date: 2026-08-28
-status: D4 evidence recorded, framing consequence AWAITING CONFIRMATION;
-        G2 design decisions FIXED
+status: D4 RESOLVED (option 1); G2 design decisions FIXED
 relates-to:
   - 2026-08-27_human_validation_plan.md (sections 2, 3, 6, 8, 14)
   - 2026-08-28_G1_result_and_decisions.md
 decides:
-  - D4 - evidence scoped; consequence for H1 framing NOT yet confirmed
-  - G2 amplitude thresholds - FIXED, gene-specific
+  - D4 - RESOLVED. Supports, not pre-empts. H1 stays a hypothesis, novelty
+    relocated onto PRIME
+  - G2 amplitude thresholds - FIXED, gene-specific and direction-specific
   - G2 sample definition and TNBC rule - FIXED
-  - BBC3 - added to G2 as descriptive, amendment recorded
-next-action: script 05 spec, then G2
+  - G2 pass criterion - FIXED
+  - BCL2L1 carries the Panel b decision if the two partners split
+  - BBC3 - added to G2 by amendment, tested in the LOSS direction
+next-action: run script 05 (G2)
 ---
 
 # D4 scoping, and the G2 design decisions that follow
@@ -133,20 +135,25 @@ would invert the model. **Lee et al. is substantive prior evidence in that
 inverting direction.** H4's buffering stratification is therefore load-bearing,
 not a robustness check, and D5 (cohort choice) must be settled with that in mind.
 
-### 1.6 AWAITING CONFIRMATION
+### 1.6 D4 RESOLVED - Option 1, confirmed 2026-08-28
 
-The evidence above is settled. The framing consequence is not, and it is an
-authorial call:
+**H1 stays a hypothesis. Its novelty is relocated onto `PRIME` and must be stated
+that way in the text. Lee et al. is cited in the introduction as prior support
+for the upstream half - MYC/MCL1 to OXPHOS - which we do not claim to discover.**
 
-- **Option 1 (recommended):** H1 stays a hypothesis; its novelty is relocated
-  onto `PRIME` and stated as such; Lee et al. cited in the introduction as prior
-  support for the upstream half.
-- **Option 2 (plan section 14's alternative):** H1 demoted to a citation, H2
-  promoted to the novel mechanism, H4 to the novel consequence.
+The alternative offered by plan section 14 (H1 demoted to a citation, H2 promoted
+to the novel mechanism, H4 to the novel consequence) is **not** taken. Lee et al.
+pre-empts the association but not the endpoint, and the endpoint is where this
+arm's claim lives.
 
-Recommendation is Option 1. Plan section 14 offers Option 2 if the paper
-pre-empts H1; it pre-empts the association but not the endpoint, and the endpoint
-is where the claim lives.
+Consequences that bind downstream writing:
+
+- No sentence may present "MYC/MCL1 co-amplification associates with OXPHOS" as a
+  finding of this work.
+- Any H1 result is stated as an apoptotic-priming claim, with the OXPHOS
+  association attributed to Lee et al.
+- The MCL1 arm of G2 is framed as **replication**; the BCL2L1 arm is the novel
+  test. See 2.8.
 
 ---
 
@@ -184,11 +191,13 @@ run on the 1,043 intersection to isolate calling method from sample set.
 
 **Decision: gene-specific, author's call, overriding my recommendation.**
 
-| Gene | Primary threshold | Base rate (ISAR, n=1,043) |
-|---|---|---|
-| `MYC` | `== +2` | 225 (21.6%) |
-| `MCL1` | `== +2` | 174 (16.7%) |
-| `BCL2L1` | `>= +1` | 479 (45.9%) |
+| Gene | Direction | Primary threshold | Base rate (ISAR, n=1,043) |
+|---|---|---|---|
+| `MYC` | gain | `== +2` | 225 (21.6%) |
+| `MCL1` | gain | `== +2` | 174 (16.7%) |
+| `BCL2L1` | gain | `>= +1` | 479 (45.9%) |
+| `BBC3` | **loss** | `<= -1` | 247 (23.7%) |
+| `BAX` (control) | **loss** | `<= -1` | 226 (21.7%) |
 
 Rationale, as given: at `+2`, `BCL2L1` is n=28 and uninterpretable, and BCL2L1 is
 this arm's *a priori* primary focus - it is the `PRIME` denominator, and the term
@@ -232,7 +241,7 @@ separately, plus the cross-tabulation. See `data/tcga_clinical/README.md`.
 `BRCA_Normal` (n=36) is artefact-prone and usually reflects low cellularity.
 Report as its own stratum; never allow it to become a silent reference level.
 
-### 2.6 BBC3 - AMENDMENT to G2, descriptive only
+### 2.6 BBC3 - AMENDMENT to G2, tested in the LOSS direction
 
 **This broadens a pre-specified gate and is recorded as an amendment, dated,
 with its reason. It is legitimate because G2 is descriptive and no outcome data
@@ -241,19 +250,53 @@ has been seen.**
 Reason for adding: `PRIME = log2(BBC3) - log2(BCL2L1)` has two terms, and testing
 CNV determinants of only the denominator is asymmetric.
 
-Finding, and why it stays descriptive: **homozygous `BBC3` deletion occurs in 11
-of 1,043 tumours under ISAR (5 of 1,050 before the `-01` filter).** A Fisher test
-on that is uninterpretable and must not be run and reported as a null. Shallow
-loss (24.4%) tracks `BAX` at 19q13.33, i.e. it is regional 19q behaviour, not
-focal to BBC3.
+**Direction: loss, not amplification.** `BBC3` (PUMA) is the pro-apoptotic
+numerator, so the `PRIME`-lowering event is deletion. `BCL2L1` and `MCL1` are
+tested for gain; `BBC3` is tested for loss. The tests are not the same shape and
+must not be described as "co-amplification" collectively.
 
-Read this as a positive finding: **the CNV route to neutralising `PRIME` exists
-on the buffer side and is effectively absent on the trigger side.** Tumours do
-not delete PUMA; they amplify the sponge. That is what the mouse model predicts,
-and it is one sentence in the paper rather than an omission.
+Observed, ISAR, n = 1,043:
+
+```
+BBC3  19q13.32   -2:   5    -1: 242    0: 541   +1: 244   +2:  11
+                 loss (<= -1): 247  (23.7%)
+```
+
+**Threshold for BBC3: `<= -1`.** Homozygous deletion is 5 tumours, and its
+crude joint count with `MYC` amplification is **zero** - that test is not
+underpowered, it is empty. `<= -1` gives 23.7%, which is testable and is the
+direct symmetric counterpart of the `>= +1` threshold chosen for `BCL2L1`. The
+`-2` counts are reported descriptively alongside.
+
+**Regional control, REQUIRED.** BBC3's shallow-loss rate is close to background
+for its neighbourhood and for other BCL2-family loci:
+
+| Gene | Cytoband | loss `<= -1` |
+|---|---|---|
+| `BBC3` | 19q13.32 | 247 (23.7%) |
+| `BAX` | 19q13.33 | 226 (21.7%) |
+| `BCL2L11` | 2q13 | 241 (23.1%) |
+| `BID` | 22q11.21 | 489 (46.9%) |
+
+So a `MYC` x `BBC3`-loss association could be arm-level 19q behaviour rather than
+PUMA-specific. ISAR plus aneuploidy conditioning is intended to absorb that, but
+it must be tested rather than trusted: **`MYC` x `BAX`-loss at `<= -1` is run as
+a regional control for 19q13.** If the `BBC3` estimate is indistinguishable from
+the `BAX` estimate, the finding is regional and is reported as such. This is the
+arm's standing "every positive needs its negatives" rule applied at CNV level.
 
 Carry the BBC3 call to script 08 as a covariate, to show `log2(BBC3)` variation
 is not CNV-driven.
+
+**Correction, 2026-08-28.** This section previously read "homozygous BBC3
+deletion occurs in 11 of 1,043 tumours" and concluded BBC3 should be descriptive
+only. **11 is the amplification (`+2`) count; homozygous deletion is 5.** The
+error was caught by the author asking whether the loss direction had been
+considered. The direction had been analysed correctly throughout, but an
+inconsistent threshold standard had been applied - `BCL2L1` was moved to `>= +1`
+for interpretability while `BBC3` was left at `-2`, where it is empty. Correcting
+the standard is what promotes BBC3 from descriptive to tested. Recorded rather
+than amended away, because this is a pre-registration document.
 
 ### 2.7 Disclosure - threshold decision was not made blind
 
@@ -273,11 +316,54 @@ the competing recommendations, and their reasons, were stated before the numbers
 existed and are time-ordered in the session transcript. Recorded here rather than
 omitted.
 
+### 2.8 Pass criterion and the Panel b decision - FIXED
+
+The plan gives G2 no numeric criterion, only "more than expected". Fixed here,
+before the statistic was computed:
+
+> **G2 passes for a partner if the aneuploidy-adjusted odds ratio exceeds 1 with
+> a 95% CI excluding 1, at that gene's primary threshold and direction, in
+> source A (ISAR).** Source B must agree in direction. A B disagreement is
+> reported, never overridden.
+
+The partners can split, and plausibly will, since `MCL1` is Lee et al.'s axis and
+`BCL2L1` is ours. Plan section 6 assumes they move together. They may not, so:
+
+**If the partners split, `BCL2L1` carries the Panel b decision.** It is the
+`PRIME` denominator and the term Lee et al. never touch. `MCL1` is reported as
+replication of Lee et al. either way.
+
+`BBC3` loss is tested on the same criterion but is **not** sufficient on its own
+to carry Panel b, because of the 19q13 regional-control caveat in 2.6.
+
+### 2.9 Statistical design
+
+For each pair, three estimates reported side by side, so the size of the
+aneuploidy confound is visible rather than assumed:
+
+| Estimate | Role |
+|---|---|
+| unadjusted Fisher, OR + 95% CI | shows the confound's magnitude |
+| logistic `partner ~ MYC + ANEUPLOIDY_SCORE`, adjusted OR | **primary** |
+| Cochran-Mantel-Haenszel, stratified by aneuploidy tertile | assumption-light check |
+
+Breslow-Day across PAM50 strata, to test whether the association genuinely
+differs by subtype rather than eyeballing five ORs.
+
+Multiplicity: the primary tests are `MYC` x `MCL1` (+2), `MYC` x `BCL2L1` (>= +1)
+and `MYC` x `BBC3` (<= -1), reported with exact p and no correction. The full
+gene x threshold grid, the strata and the `BAX` regional control are secondary,
+BH-adjusted within family and labelled exploratory in the output table.
+
+`FRACTION_GENOME_ALTERED` is the pre-specified alternative to `ANEUPLOIDY_SCORE`;
+the primary uses the latter and confirms with the former. n is reported per
+model, since aneuploidy is missing for roughly 57 cases.
+
 ---
 
 ## 3. Still open
 
-- **D4 framing consequence** - Option 1 vs Option 2 above. Recommended Option 1.
+- ~~D4 framing consequence~~ - RESOLVED, Option 1. See 1.6.
 - **D5** - primary neoadjuvant cohort. Now more urgent: section 1.5 makes H4's
   buffered/unbuffered split load-bearing against Lee et al., so the cohort must
   support it.
