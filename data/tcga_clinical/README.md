@@ -132,3 +132,53 @@ are not TNBC. The divergence is large enough that "basal / TNBC" in plan section
 - These are **patient** barcodes. The GISTIC files are aliquot-level. Join only
   after applying the `-01` sample-type filter described in
   `data/gistic_tcga_brca/README.md`.
+
+---
+
+## `gdc_brca_rnaseq_aliquots_2026-08-28.tsv`
+
+Added 2026-08-28 to recover **sequencing plate**, a pre-specified Block C
+covariate (plan section 8). Plate is field 6 of the ALIQUOT barcode, and the
+Xena expression matrix carries only sample-level ids, so it cannot be recovered
+from the expression data alone.
+
+| | |
+|---|---|
+| Rows | 1,231 (1,111 primary tumour, 113 normal, 7 metastatic) |
+| Columns | `sample_id`, `patient`, `aliquot_barcode`, `plate`, `sample_type` |
+| Distinct plates, primary | 43 |
+| SHA-256 | `703ac03b6bb997dad0b67c28f842b99598d3fbc1d57ec6c1a78bb66e686128ad` |
+
+Query, verbatim:
+
+```
+GET https://api.gdc.cancer.gov/files
+  filters={"op":"and","content":[
+    {"op":"in","content":{"field":"cases.project.project_id","value":["TCGA-BRCA"]}},
+    {"op":"in","content":{"field":"data_type","value":["Gene Expression Quantification"]}},
+    {"op":"in","content":{"field":"analysis.workflow_type","value":["STAR - Counts"]}}]}
+  fields=cases.samples.portions.analytes.aliquots.submitter_id,
+         cases.samples.submitter_id,cases.samples.sample_type
+  size=2000  format=TSV
+```
+
+`cases.samples.submitter_id` is sample-level (`TCGA-A8-A09E-01A`), which is
+exactly the Xena column format, so the join to script 01's `sample_map` is direct.
+
+### It independently confirms the Xena averaging
+
+Five sample ids carry **two** RNA-seq aliquots each, the second re-sequenced on
+plate `A277`:
+
+```
+TCGA-A7-A0DB-01A   A00Z, A277
+TCGA-A7-A13D-01A   A12P, A277
+TCGA-A7-A13E-01A   A12P, A277
+TCGA-A7-A26E-01A   A169, A277
+TCGA-A7-A26J-01A   A169, A277
+```
+
+These are **exactly** the five columns script 01 flags as Xena aliquot averages,
+identified there by an entirely different route - the half-integer signature in
+the inverted log2 values. Two independent lines of evidence, same five samples.
+See `data/tcga_expression_xena/README.md`.

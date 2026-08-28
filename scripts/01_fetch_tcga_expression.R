@@ -262,6 +262,13 @@ if (any(duplicated(pat))) {
   counts_raw <- counts_raw[, first, drop = FALSE]
   pat        <- pat[first]
 }
+# Record WHICH sample id survived for each patient, before the columns are
+# renamed to patient barcodes. Script 03 needs it to join the sequencing plate,
+# which lives in the aliquot barcode and cannot be recovered from a patient id.
+# Re-deriving this in 03 by re-applying the rules would put the same logic in
+# two files, which is how they drift apart.
+sample_map <- tibble::tibble(patient = pat, sample_id = colnames(counts_raw))
+
 colnames(counts_raw) <- pat
 stopifnot(!any(duplicated(colnames(counts_raw))))
 message("   primary tumours, one per patient: ", ncol(counts_raw))
@@ -316,7 +323,8 @@ dds <- estimateSizeFactors(dds)
 mat_linear <- counts(dds, normalized = TRUE)
 stopifnot(min(mat_linear) >= 0)
 saveRDS(list(mat = mat_linear, scale = "linear_deseq2_normalised",
-             consumer = "mitoPPS only", built = Sys.time()), PATH_LINEAR)
+             consumer = "mitoPPS only", sample_map = sample_map,
+             built = Sys.time()), PATH_LINEAR)
 message("\n4a. LINEAR matrix saved -> ", basename(PATH_LINEAR),
         "  (range ", sprintf("%.1f", min(mat_linear)), " to ",
         sprintf("%.0f", max(mat_linear)), ")")
@@ -327,8 +335,8 @@ message("\n4a. LINEAR matrix saved -> ", basename(PATH_LINEAR),
 vsd <- vst(dds, blind = TRUE)
 mat_vst <- assay(vsd)
 saveRDS(list(mat = mat_vst, scale = "log_vst",
-             consumer = "GSVA/ssGSEA, kcdf = Gaussian", built = Sys.time()),
-        PATH_VST)
+             consumer = "GSVA/ssGSEA, kcdf = Gaussian", sample_map = sample_map,
+             built = Sys.time()), PATH_VST)
 message("4b. VST matrix saved    -> ", basename(PATH_VST),
         "  (range ", sprintf("%.1f", min(mat_vst)), " to ",
         sprintf("%.1f", max(mat_vst)), ")")
@@ -354,6 +362,8 @@ message("   library size   median ", format(median(qc$library_size), big.mark = 
         "  min ", format(min(qc$library_size), big.mark = ","))
 message("   genes detected median ", median(qc$genes_detected))
 readr::write_csv(qc, file.path(DIR_TABLES, "tcga_brca_expression_qc.csv"))
+readr::write_csv(sample_map,
+                 file.path(DIR_TABLES, "tcga_brca_sample_map.csv"))
 
 # -----------------------------------------------------------------------------
 # 6. GATE G1, second criterion - correlation structure
