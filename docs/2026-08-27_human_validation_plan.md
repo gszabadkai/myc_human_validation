@@ -7,7 +7,9 @@ relates-to:
   - myc_mouse_finalisation_plan.md (AP7 MB-fork validation; this doc is the human-side counterpart)
   - docs/library_reference/2026-08-22_consensus_myc_double_hit_thread.md
   - Menegollo et al. 2024, Cancer Research (companion paper)
-next-action: resolve D1, D2, D4, D5 below, then run G1-G3
+next-action: confirm D7, then script 01 (discharges G1's correlation criterion)
+resolved: D1, D2 (G1 note), D3, D4, D5 (dated notes in docs/)
+open: D6, D7, and G1's correlation criterion
 changes-in-v2:
   - added H4 (conditional chemosensitivity) and Block F (clinical outcome)
   - added Block G (DepMap dependency), an orthogonal functional test
@@ -123,6 +125,10 @@ So: **OXPHOS-high is protective unless buffered.** Formally, a three-way
 `MYC x OXPHOS x BUFFER` structure on a treatment-responsive endpoint, and a
 `score x treatment` interaction where randomised or treatment-stratified data exist.
 
+**Tested continuously as primary** (section 7.5, amended 2026-08-28), with the
+categorical `STATE` contrast as pre-specified secondary. Powered for a large
+conditional effect only - see Block F1 and the D5 note.
+
 Why this framing and not the simpler one:
 
 - **Reduced priming predicts chemoresistance trivially.** That is the entire
@@ -176,7 +182,9 @@ cohorts.
 | Survivor adaptation / second hit (H1-H3) | **TCGA-BRCA** | CNV, MC3 mutation calls, ABSOLUTE purity, RPPA. Nothing else has all four. |
 | Replication of the coupling | **METABRIC** | n ~2000, biclusters native, long follow-up. |
 | Independent third | **SCAN-B (Brueffer)** | RNA-seq, large n, treatment-stratified. Already used in Menegollo Fig 7H-L. |
-| **Chemoresistance (H4), primary** | **Neoadjuvant cohorts with pCR/RCB** | Uniform treatment by design, binary endpoint, well powered. GSE25066 (Hatzis, n=508, taxane-anthracycline); I-SPY1 (GSE22226); BrighTNess (GSE164458, TNBC - matches the ER-negative MB2_UF state). |
+| **Chemoresistance (H4), primary** | **I-SPY2-990 (GSE194040), n=988** | Largest public neoadjuvant cohort with pre-treatment expression and complete pCR (319 events, 32.3%). Randomised, 14 arms with a 179-patient paclitaxel control, so `score x treatment` is testable. RPPA companion GSE196093 (736 of the same patients). **D5 RESOLVED 2026-08-28 - see that note; selected by documented search, not assertion.** |
+| **Chemoresistance (H4), replication** | **BrighTNess (GSE164458), n=482** | Randomised, TNBC-only, RNA-seq. Tests whether BCL2L1's subtype-breadth (G2) holds in the matched stratum. |
+| **Chemoresistance (H4), third** | **GSE25066 (Hatzis), n=508** | Demoted from primary: single-arm, so it cannot test treatment interaction, and its 2011 HG-U133A array carries one multi-mapping `BBC3` probe. Retained as a genuinely independent replication (different platform generation and era). |
 | **Chemoresistance (H4), secondary** | **SCAN-B endocrine-only vs endocrine+chemo strata** | Template already exists in the companion paper. Not randomised - see caveat below. |
 | **Functional orthogonal test** | **DepMap / CCLE / PRISM / GDSC** | MCL1 and BCL2L1 dependency, and MCL1i/BCL-XLi sensitivity, against MYC and OXPHOS status. Not observational. |
 | Permissive window / pre-malignant trajectory | **Hannon (Rebbeck, Xian et al. 2022)** | The only human dataset with the mouse's axis. Count matrix requested. **Out of scope until it lands.** |
@@ -511,6 +519,19 @@ measure.
 Pre-specify **before** looking at outcome data. A three-way conjunction on median splits
 gives eight cells; picking the worst post hoc is p-hacking.
 
+> **AMENDED 2026-08-28 (D5).** The **primary** H4 test is now the **continuous**
+> three-way `MYC x OXPHOS x BUFFER` interaction. `STATE` below and its
+> level-3-vs-level-4 contrast are the **pre-specified secondary**, reported alongside.
+>
+> Reason: simulation at n=988 shows median splits cost up to **53 percentage points**
+> of power against the identical truth (D5 note section 5.2). This amendment is made
+> before script 11 exists, before any H4 outcome data has been touched, and from a
+> simulation containing no project data - it is a power decision, not a response to a
+> result. Both specifications are fixed now and both will be reported.
+>
+> `STATE` remains frozen in script 11 and must still not be revised after outcome data
+> is seen. Its **role** changes; its **definition** does not.
+
 Fixed definition:
 
 ```
@@ -522,11 +543,11 @@ STATE = factor, four levels, in this order:
 ```
 
 Splits at cohort median for MYC and OXPHOS; BUFFER by GISTIC amplification where CNV
-exists, else by expression tertile. Continuous version as sensitivity, not as an
-alternative to be swapped in if the categorical fails.
+exists, else by expression tertile.
 
-Primary H4 contrast: **level 3 vs level 4**. That single contrast is the whole
-prediction and it is one degree of freedom.
+Secondary H4 contrast: **level 3 vs level 4**. That single contrast is the whole
+prediction and it is one degree of freedom. It is reported alongside the continuous
+primary, never instead of it, and never selected between after the fact.
 
 ---
 
@@ -609,17 +630,37 @@ BCL2L1_expr ~ MYC * OXPHOS + covariates
 **F1. Chemoresistance, primary. Neoadjuvant cohorts, pCR endpoint.**
 
 ```
-pCR ~ STATE + stage + grade + ER_status + regimen        # logistic
+# PRIMARY (continuous, D5 2026-08-28)
+pCR ~ MYC * OXPHOS * BUFFER + stage + grade + ER_status + arm    # logistic
+
+# SECONDARY (categorical, section 7.5)
+pCR ~ STATE + stage + grade + ER_status + arm                    # logistic
 ```
 
-Primary contrast: `STATE` level 3 (unbuffered) vs level 4 (buffered). Prediction:
-level 3 has **higher** pCR than level 4. Also higher than level 2 (OXPHOS-low).
+Primary test: the three-way `MYC:OXPHOS:BUFFER` coefficient. Secondary contrast:
+`STATE` level 3 (unbuffered) vs level 4 (buffered). Prediction: level 3 has **higher**
+pCR than level 4, and higher than level 2 (OXPHOS-low). Report both, always.
 
-Repeat in each cohort separately, then meta-analyse. Do not pool raw expression across
-platforms; score each cohort independently (GSVA is cohort-relative).
+`arm` is not optional in I-SPY2: 14 arms spanning 17.3% to 59.1% pCR, several
+HER2-targeted and so confounded with subtype. Adjust or stratify.
 
-TNBC-only sensitivity in BrighTNess, since that is the closest match to the ER-negative
-MB2_UF state.
+**Three cohorts, meta-analysed - not one cohort with two afterthoughts.** Score each
+independently (GSVA is cohort-relative) and meta-analyse the three interaction
+estimates. Pooling scores across cohorts remains forbidden. Report per-cohort
+estimates, the pooled estimate, and heterogeneity.
+
+TNBC-only sensitivity in BrighTNess. Note this now tests whether BCL2L1's
+subtype-breadth (G2) holds in the matched stratum, rather than assuming a subtype
+match - see the D5 note section 1.
+
+**Powered for a large effect only.** Pre-registered: at a target-cell risk ratio of
+2.0 the meta-analysis sits at 86% power and any single cohort below 60% (D5 note
+section 5). Report confidence intervals, not p-values alone. A null H4 is
+"not powered to exclude a modest effect", **not** falsification.
+
+**The two-way is not a fallback.** Dropping `BUFFER` buys about five percentage
+points of power while sacrificing the entire distinction from Lee et al. 2017. Do not
+retreat to it.
 
 **F2. Treatment interaction, secondary. METABRIC and SCAN-B.**
 
@@ -715,7 +756,7 @@ New repo `myc_human_validation` (pending D1). Same conventions as `myc_mouse`.
 09_interaction_models.R           # Block C + specificity battery + strata   -> Panel a
 10_buffering_models.R             # Block B                                  -> Panel b
 11_build_state_variable.R         # section 7.5, frozen before Block F
-12_fetch_neoadjuvant_cohorts.R    # GSE25066, GSE22226, GSE164458
+12_fetch_neoadjuvant_cohorts.R    # GSE194040 primary, GSE164458, GSE25066
 13_outcome_models.R               # Block F1-F4                              -> Panel c
 14_depmap_dependency.R            # Block G                                  -> Panel c inset
 15_forkscale_replication.R        # Block D + D2                             -> ED2
@@ -800,10 +841,14 @@ Do not build 09 before G1 and G2 return. Do not build 13 before F3 returns.
   MYC/MCL1/OXPHOS finding pre-empts H1 or supports it. If it pre-empts, H1 becomes a
   citation, H2 becomes the novel mechanism, and H4 becomes the novel *consequence* -
   which is arguably a better paper. **Do this before G2.**
-- **D5 - NEW. Which neoadjuvant cohort is primary for H4?** GSE25066 has the largest n
-  and the longest track record but is unselected for subtype. BrighTNess is TNBC-only,
-  matching MB2_UF, but smaller and more recent. Recommend GSE25066 primary, BrighTNess
-  as the subtype-matched replication. Confirm.
+- **D5 - RESOLVED 2026-08-28.** The original candidate set was undocumented, so D5 was
+  reopened rather than confirmed. A pre-specified search (GEO E-utilities 447 series ->
+  34 passing; PubMed; Consensus) gives: **I-SPY2-990 (GSE194040, n=988) primary**,
+  BrighTNess (GSE164458, n=482) replication, GSE25066 (n=508) third, I-SPY1 (GSE22226,
+  n=150) dropped. GSE25066 is demoted because it is single-arm and so cannot test
+  treatment interaction. Two consequent decisions: the H4 primary test becomes
+  **continuous** (section 7.5 amended), and H4 uses **all three cohorts meta-analysed**.
+  See `docs/2026-08-28_D5_cohort_selection.md`.
 - **D6 - NEW. Does the mouse arm have a metastasis phenotype to anchor F4 to?** The
   manuscript's framing mentions metastatic capacity. If there is a mouse readout, F4
   gains a cross-species anchor and might justify supplementary space. If not, drop F4.
