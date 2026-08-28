@@ -35,10 +35,10 @@
 
 source(here::here("scripts", "00_setup_packages.R"))
 
-.check_packages("TCGAbiolinks", "TCGA download")
 suppressPackageStartupMessages({
-  library(SummarizedExperiment)
+  library(SummarizedExperiment)   # for assay() on the DESeqTransform
   library(DESeq2)
+  library(data.table)
 })
 
 message("\n01: TCGA-BRCA expression\n", strrep("=", 78))
@@ -46,163 +46,224 @@ message("\n01: TCGA-BRCA expression\n", strrep("=", 78))
 DIR_TCGA_RAW <- file.path(DIR_DATA, "raw", "tcga_brca_expression")
 .ensure_dir(DIR_TCGA_RAW)
 
-PATH_SE      <- file.path(DIR_TCGA_RAW, "tcga_brca_star_counts_se.rds")
+PATH_SE      <- file.path(DIR_TCGA_RAW, "tcga_brca_star_counts.rds")
 PATH_VST     <- file.path(DIR_RESULTS, "tcga_brca_vst.rds")
 PATH_LINEAR  <- file.path(DIR_RESULTS, "tcga_brca_linear.rds")
 PATH_G1CORR  <- file.path(DIR_RESULTS, "g1_correlation_criterion.rds")
 
 # -----------------------------------------------------------------------------
-# 1. Fetch (cached)
+# 1. Fetch: UCSC Xena STAR counts matrix
 # -----------------------------------------------------------------------------
-# GDCdownload writes into a GDCdata/ directory under the working directory.
-# It is pointed at data/raw/ explicitly so nothing lands in the repo root.
+# SOURCE DECISION, 2026-08-28. The plan says "GDC harmonised STAR counts via
+# TCGAbiolinks (or recount3)". The GDC per-file route was tried first and is
+# impractical here: 5.2 GB across 1231 files, measured at 0.05 files/s, i.e.
+# about 7 hours, over a transport that failed twice on the way.
+#
+# Xena re-hosts the SAME GDC STAR-Counts quantification as a single 138 MB
+# matrix. Same pipeline, same GENCODE v36, same versioned ENSG ids.
+#
+# What this costs, stated rather than waved away:
+#   1. Provenance is one hop longer - Xena's snapshot of a GDC release, not the
+#      GDC API directly. Mitigated by snapshotting with a SHA-256 and a README,
+#      exactly as done for CollecTRI and GISTIC.
+#   2. Values arrive as log2(count + 1) and must be inverted. Verified lossless:
+#      the stored values are exact log2 of integers (3.321928... = log2(10),
+#      3.0 = log2(8), 0.0 = log2(1)), so round(2^x - 1) recovers raw counts
+#      exactly. The inversion is asserted below, not assumed.
+#   3. Xena columns are sample-level with vial (TCGA-B6-A1KC-01B), so some
+#      aliquot collapsing is already baked in upstream and is not visible to us.
+#      Section 2 therefore uses a slightly different rule from the GDC path;
+#      it is documented there.
+#
+# Gene annotation does NOT come from Xena. Xena ships only ENSG ids, and its
+# published probeMap is GENCODE v22 against v36 data. Instead the annotation is
+# read from one of the GDC per-file downloads already on disk, which carries
+# gene_id / gene_name / gene_type at the matching GENCODE v36. Same build, local,
+# already provenanced.
 
-# TCGAbiolinks' `directory` argument controls only where the FINAL per-file
-# folders are placed. It writes its chunk tarballs, the extracted UUID
-# directories and MANIFEST.txt into getwd() regardless. Run from the project
-# root, that fills the repo root with hundreds of UUID folders and a multi-
-# hundred-MB tarball. So the download is fenced inside its own directory and the
-# working directory is restored on exit, including on error.
-#
-# The download is resumable: GDCdownload skips files already present, so an
-# interrupted run continues rather than starting over.
-#
-# If the API route keeps failing on truncated chunks, the robust alternative is
-# the GDC Data Transfer Tool: install gdc-client, then add method = "client".
-.fetch_gdc <- function(query, dest, per_chunk, timeout_s, method) {
-  old_wd <- setwd(dest)                    # setwd() returns the PREVIOUS wd
-  on.exit(setwd(old_wd), add = TRUE)
-  old_to <- options(timeout = timeout_s)
-  on.exit(options(old_to), add = TRUE)
-  if (identical(method, "client")) {
-    # gdc-client fetches files individually in parallel and retries per file,
-    # so one bad stream costs one 4 MB file rather than a whole chunk.
-    # files.per.chunk does not apply to this route.
-    TCGAbiolinks::GDCdownload(query, directory = "GDCdata", method = "client")
-  } else {
-    TCGAbiolinks::GDCdownload(query, directory = "GDCdata", method = "api",
-                              files.per.chunk = per_chunk)
-  }
-  TCGAbiolinks::GDCprepare(query, directory = "GDCdata")
+PATH_XENA <- file.path(DIR_DATA, "raw", "tcga_expression_xena",
+                       "TCGA-BRCA.star_counts.tsv.gz")
+XENA_SHA256 <- "058d79121460c535b73312247a55d3108d18ea6ddd0ccc1070b5dd93ceeedaa4"
+
+if (!file.exists(PATH_XENA)) {
+  stop("Xena matrix not found at ", PATH_XENA,
+       "\nSee data/tcga_expression_xena/README.md for the URL and checksum.",
+       call. = FALSE)
 }
 
-# Small chunks on purpose. The default packs ~1 GB into one tarball, and a
-# single truncated stream throws the whole chunk away and re-downloads it.
-# 50 files is roughly 200 MB, so a failure costs a fifth as much.
-GDC_FILES_PER_CHUNK <- 50L
-
-# THE ONE THAT ACTUALLY MATTERS. R's default download timeout is 60 SECONDS,
-# which no multi-GB download can meet. It presents as
-#   "truncated gzip input: Unknown error: -1"
-# followed, after TCGAbiolinks' retry also times out, by
-#   "Error in if (ret == 1) ... : argument is of length zero"
-# The giveaway that it is a clock and not a size limit: the first run truncated
-# at 63 MB and the retry at 140 MB. A size cap fails at the same point every
-# time; a wall-clock timeout fails wherever the transfer has reached.
-# Set generously - this is a ceiling, not a delay.
-GDC_TIMEOUT_SECONDS <- 14400L   # 4 hours
-
-# Route. "client" uses the GDC Data Transfer Tool: parallel per-file downloads
-# with per-file retry, so a bad stream costs one 4 MB file instead of a chunk.
-# It is preferred when available and the script falls back to the API route
-# otherwise, so a fresh checkout without the tool still works.
-#
-# gdc-client is NOT in Homebrew, despite what a search suggests. Install the
-# binary from NCI:
-#   https://gdc.cancer.gov/access-data/gdc-data-transfer-tool
-# Apple Silicon build (v2.3.0, verified working here):
-#   gdc-client_2.3_OSX_x64-py3.8-macos-14.zip
-#   -> unzip twice (it is a zip inside a zip), chmod +x, put on PATH
-GDC_METHOD <- if (nzchar(Sys.which("gdc-client"))) "client" else "api"
-
 if (file.exists(PATH_SE)) {
-  message("1. cached SummarizedExperiment found, skipping download")
-  se <- readRDS(PATH_SE)
+  message("1. cached counts matrix found, skipping rebuild")
+  cached <- readRDS(PATH_SE)
+  counts_raw <- cached$counts
+  gene_ann   <- cached$annotation
+  attr(counts_raw, "averaged_col") <- cached$averaged_col
 } else {
-  message("1. querying GDC (~5.2 GB over ~1231 files; resumable, runs once)")
-  message("   route: ", GDC_METHOD,
-          if (GDC_METHOD == "client") "  (gdc-client found on PATH)"
-          else "  (gdc-client not found; install it for a faster, more robust fetch)")
-  q <- TCGAbiolinks::GDCquery(
-    project       = "TCGA-BRCA",
-    data.category = "Transcriptome Profiling",
-    data.type     = "Gene Expression Quantification",
-    workflow.type = "STAR - Counts"
-  )
-  se <- .fetch_gdc(q, DIR_TCGA_RAW, GDC_FILES_PER_CHUNK, GDC_TIMEOUT_SECONDS,
-                   GDC_METHOD)
-  saveRDS(se, PATH_SE)
+  message("1. reading Xena STAR counts matrix (138 MB, log2 scale on disk)")
+  xz <- data.table::fread(cmd = paste("gzip -dc", shQuote(PATH_XENA)),
+                          sep = "\t", header = TRUE, showProgress = FALSE)
+  gid <- xz[[1]]
+  xm  <- as.matrix(xz[, -1, with = FALSE])
+  rownames(xm) <- gid
+  message("   ", nrow(xm), " genes x ", ncol(xm), " samples")
+
+  # --- invert log2(count + 1) -----------------------------------------------
+  # Verified against 4 GDC per-file downloads: after inversion and rounding the
+  # values match GDC "unstranded" raw counts EXACTLY across 4,000 genes, on a
+  # blind match (each GDC sample identified exactly one Xena column).
+  #
+  # BUT the inversion is not integral everywhere, and the exception matters.
+  # Deviations are either ~0 or EXACTLY 0.5 - never in between - and they are
+  # confined to 5 of 1,226 columns, in which ~49% of genes are half-integers.
+  # That is the signature of averaging two integers, and every affected column
+  # is a "-01A" for a patient who also has a "-01B"/"-01C" column.
+  #
+  # Xena has AVERAGED replicate aliquots into those five columns. They are not
+  # raw counts, DESeq2 must not be given them, and section 2 must not select
+  # them. They are detected here rather than assumed, so a future Xena release
+  # that averages different samples is caught rather than silently accepted.
+  message("   inverting log2(count + 1) -> raw counts")
+  lin <- 2^xm - 1
+  frac <- abs(lin - round(lin))
+
+  averaged_col <- apply(frac, 2L, function(v) any(v > 0.25, na.rm = TRUE))
+  if (any(averaged_col)) {
+    message("   ", sum(averaged_col), " column(s) contain half-integer values, ",
+            "i.e. Xena aliquot averages, and are flagged:")
+    for (nm in colnames(lin)[averaged_col]) message("     ", nm)
+  }
+  # Any residual non-integrality OUTSIDE those columns would mean the values are
+  # not log2(raw count + 1) at all, and that is fatal.
+  resid <- max(frac[, !averaged_col, drop = FALSE], na.rm = TRUE)
+  message(sprintf("   max deviation outside those columns: %.3e", resid))
+  if (resid > 1e-3) {
+    stop("log2 inversion is not returning integers even outside the averaged ",
+         "columns (max deviation ", resid, "). The Xena values are not ",
+         "log2(raw count + 1) as assumed; stop and re-check the source.",
+         call. = FALSE)
+  }
+
+  counts_raw <- round(lin)
+  storage.mode(counts_raw) <- "integer"
+  attr(counts_raw, "averaged_col") <- colnames(lin)[averaged_col]
+  rm(xz, xm, lin, frac); invisible(gc())
+
+  # --- annotation from a local GDC file, GENCODE v36 ------------------------
+  gdc_any <- list.files(DIR_TCGA_RAW, pattern = "augmented_star_gene_counts\\.tsv$",
+                        recursive = TRUE, full.names = TRUE)
+  if (!length(gdc_any)) {
+    stop("no GDC per-file download found to take gene annotation from. ",
+         "Keep at least one *.augmented_star_gene_counts.tsv under ",
+         DIR_TCGA_RAW, call. = FALSE)
+  }
+  ann <- data.table::fread(gdc_any[1], sep = "\t", skip = 1L,
+                           showProgress = FALSE)
+  gene_ann <- as.data.frame(ann[, c("gene_id", "gene_name", "gene_type")])
+  gene_ann <- gene_ann[!startsWith(gene_ann$gene_id, "N_"), ]
+  message("   annotation from ", basename(gdc_any[1]), ": ",
+          nrow(gene_ann), " genes (GENCODE v36)")
+
+  saveRDS(list(counts = counts_raw, annotation = gene_ann,
+               averaged_col = attr(counts_raw, "averaged_col"),
+               source = "UCSC Xena GDC hub, TCGA-BRCA.star_counts.tsv.gz",
+               sha256 = XENA_SHA256, built = Sys.time()), PATH_SE)
   message("   cached to ", PATH_SE)
 }
 
-stopifnot(inherits(se, "SummarizedExperiment"))
-message("   raw object: ", nrow(se), " genes x ", ncol(se), " samples")
-message("   assays: ", paste(assayNames(se), collapse = ", "))
+# Align matrix rows to the annotation. Xena and GDC share GENCODE v36 versioned
+# ids, so this is an exact join; anything unmatched is a real inconsistency and
+# is reported rather than silently dropped.
+common <- intersect(rownames(counts_raw), gene_ann$gene_id)
+message("   gene ids matched to annotation: ", length(common),
+        " of ", nrow(counts_raw))
+if (length(common) < 0.95 * nrow(counts_raw)) {
+  stop("fewer than 95% of Xena gene ids matched the GDC annotation. ",
+       "The two are probably on different GENCODE builds.", call. = FALSE)
+}
+counts_raw <- counts_raw[common, , drop = FALSE]
+gene_ann   <- gene_ann[match(common, gene_ann$gene_id), ]
+stopifnot(identical(rownames(counts_raw), gene_ann$gene_id))
 
 # -----------------------------------------------------------------------------
 # 2. Samples: primary tumours only, one per patient
 # -----------------------------------------------------------------------------
-# The SAME rule as G2 (see data/gistic_tcga_brca/README.md): sample type -01,
-# one column per patient.  Using a different rule here would silently
-# de-align the expression analysis from the copy-number analysis.
+# Same INTENT as G2 (see data/gistic_tcga_brca/README.md): primary solid tumour
+# only, one column per patient, so the expression and copy-number analyses stay
+# aligned.
 #
-# Unlike GISTIC, TCGA expression has genuine within-patient replicate aliquots.
-# Those need a deterministic tie-break, so the rule is stated rather than left
-# to whichever column happens to come first.
+# The mechanics differ from the GDC per-file route, and the difference matters.
+# Xena columns are SAMPLE-level with the vial letter (TCGA-B6-A1KC-01B) rather
+# than full aliquot barcodes.
+#
+# TIE-BREAK, and why it is not simply "vial A". Section 1 finds that Xena has
+# AVERAGED replicate aliquots into 5 columns, all of them "-01A" for patients
+# that also carry a clean "-01B"/"-01C". A naive "keep the lowest vial" rule
+# would therefore select the averaged, non-integer column for every one of those
+# patients and discard the clean one - the exact wrong choice, silently, in 5
+# cases.
+#
+# So the rule is, in order:
+#   1. drop averaged columns outright where the patient has a clean alternative
+#   2. among what remains, keep the LOWEST vial letter (A before B before C)
+#
+# A patient whose ONLY column is averaged would be kept and reported, since
+# dropping the patient entirely is worse than carrying one averaged sample. On
+# the current release no patient is in that position.
 
-bc  <- colnames(se)
+bc  <- colnames(counts_raw)
 pat <- vapply(strsplit(bc, "-"), function(p) paste(p[1:3], collapse = "-"), character(1))
 sty <- substr(vapply(strsplit(bc, "-"), `[`, character(1), 4), 1, 2)
+vial <- substr(vapply(strsplit(bc, "-"), `[`, character(1), 4), 3, 3)
 
 message("\n2. sample types present: ",
         paste(sprintf("%s=%d", names(table(sty)), table(sty)), collapse = " "))
 
-keep <- which(sty == "01")
-se   <- se[, keep]
-pat  <- pat[keep]
+averaged <- colnames(counts_raw) %in% attr(counts_raw, "averaged_col")
 
-# Deterministic tie-break: for a patient with several -01 aliquots, keep the one
-# with the highest library size.  Highest depth is the defensible choice and,
-# being a property of the data rather than of barcode ordering, it is stable
-# across re-runs and across GDC re-releases.
-if (any(duplicated(pat))) {
-  libsize <- colSums(assay(se, "unstranded"))
-  ord     <- order(pat, -libsize)
-  se      <- se[, ord]
-  pat     <- pat[ord]
-  first   <- !duplicated(pat)
-  message("   ", sum(!first), " replicate aliquot(s) dropped (kept highest depth)")
-  se  <- se[, first]
-  pat <- pat[first]
+keep       <- which(sty == "01")
+counts_raw <- counts_raw[, keep, drop = FALSE]
+pat        <- pat[keep]; vial <- vial[keep]; averaged <- averaged[keep]
+
+message("   Xena-averaged columns among primary tumours: ", sum(averaged))
+
+# Drop an averaged column only when that patient has a clean alternative.
+has_clean <- pat %in% pat[!averaged]
+drop_avg  <- averaged & has_clean
+if (any(drop_avg)) {
+  message("   dropping ", sum(drop_avg),
+          " averaged column(s) in favour of a clean aliquot for the same patient")
+  counts_raw <- counts_raw[, !drop_avg, drop = FALSE]
+  pat <- pat[!drop_avg]; vial <- vial[!drop_avg]; averaged <- averaged[!drop_avg]
 }
-colnames(se) <- pat
-stopifnot(!any(duplicated(colnames(se))))
-message("   primary tumours, one per patient: ", ncol(se))
+if (any(averaged)) {
+  message("   NOTE: ", sum(averaged), " patient(s) retained with an averaged ",
+          "column because no clean aliquot exists: ",
+          paste(pat[averaged], collapse = ", "))
+}
+
+if (any(duplicated(pat))) {
+  ord        <- order(pat, vial)          # A before B before C
+  counts_raw <- counts_raw[, ord, drop = FALSE]
+  pat        <- pat[ord]; vial <- vial[ord]
+  first      <- !duplicated(pat)
+  message("   ", sum(!first), " further duplicate column(s) dropped (kept lowest vial)")
+  counts_raw <- counts_raw[, first, drop = FALSE]
+  pat        <- pat[first]
+}
+colnames(counts_raw) <- pat
+stopifnot(!any(duplicated(colnames(counts_raw))))
+message("   primary tumours, one per patient: ", ncol(counts_raw))
 
 # -----------------------------------------------------------------------------
 # 3. Genes: protein-coding, symbol-keyed, deterministic collapse
 # -----------------------------------------------------------------------------
-rd <- as.data.frame(rowData(se))
-stopifnot(all(c("gene_name", "gene_type") %in% names(rd)))
-
-# "unstranded" is the raw count assay of the STAR-Counts workflow. GDCprepare
-# also returns tpm_/fpkm_ assays; those are already normalised and must not be
-# fed to DESeq2, so the assay is named explicitly and asserted rather than
-# taken positionally.
-if (!"unstranded" %in% assayNames(se)) {
-  stop("expected an 'unstranded' raw-count assay, found: ",
-       paste(assayNames(se), collapse = ", "), call. = FALSE)
-}
-counts <- assay(se, "unstranded")
-mode(counts) <- "integer"
-
 # Keep protein-coding. mtDNA-encoded MT- genes are retained here: script 07
 # holds them in their own synthetic pathway and never pools them with
 # nuclear-encoded OXPHOS subunits (CLAUDE.md, standing convention).
-is_pc <- rd$gene_type == "protein_coding" & !is.na(rd$gene_name) & rd$gene_name != ""
-message("\n3. protein-coding genes: ", sum(is_pc), " of ", nrow(rd))
-counts <- counts[is_pc, , drop = FALSE]
-sym    <- rd$gene_name[is_pc]
+is_pc <- gene_ann$gene_type == "protein_coding" &
+         !is.na(gene_ann$gene_name) & gene_ann$gene_name != ""
+message("\n3. protein-coding genes: ", sum(is_pc), " of ", nrow(gene_ann))
+counts <- counts_raw[is_pc, , drop = FALSE]
+sym    <- gene_ann$gene_name[is_pc]
 
 # Collapse duplicate symbols by highest mean count. Summing would inflate genes
 # that happen to carry several ENSG ids; picking the dominant transcript keeps
