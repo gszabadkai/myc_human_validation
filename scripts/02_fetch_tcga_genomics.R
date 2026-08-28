@@ -41,6 +41,32 @@ for (p in c(PATH_MC3, PATH_ABS, PATH_LEUK, PATH_RPPA, PATH_ARM)) {
   }
 }
 
+# Expected sizes, so a PARTIAL download is caught here rather than 100 lines
+# later as a misleading gzip or fread error. A truncated .gz surfaces as
+# "unexpected end of file" from gzip, which fread reports as a possible full
+# disk - a message that points nowhere near the actual cause.
+EXPECT_BYTES <- c(
+  "mc3.v0.2.8.PUBLIC.maf.gz"                    = 753339089,
+  "TCGA_mastercalls.abs_tables_JSedit.fixed.txt" =    901812,
+  "TCGA_all_leuk_estimate.masked.20170107.tsv"   =    560473,
+  "TCGA-RPPA-pancan-clean.txt"                   =  18901234,
+  "PANCAN_ArmCallsAndAneuploidyScore_092817.txt" =   1079849
+)
+for (p in c(PATH_MC3, PATH_ABS, PATH_LEUK, PATH_RPPA, PATH_ARM)) {
+  nm  <- basename(p)
+  got <- file.size(p)
+  want <- EXPECT_BYTES[[nm]]
+  if (!identical(as.numeric(got), as.numeric(want))) {
+    stop(nm, " is ", format(got, big.mark = ","), " bytes but should be ",
+         format(want, big.mark = ","), " (",
+         sprintf("%.0f%%", 100 * got / want), " complete).\n",
+         "The download is unfinished or corrupt. Wait for it, or re-fetch:\n",
+         "  curl -L https://api.gdc.cancer.gov/data/<UUID> -o ", p, "\n",
+         "UUIDs are in data/tcga_pancanatlas/README.md.", call. = FALSE)
+  }
+}
+message("all 5 inputs present and complete")
+
 .patient_of <- function(bc) {
   vapply(strsplit(bc, "-"), function(p) paste(p[1:3], collapse = "-"), character(1))
 }
