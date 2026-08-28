@@ -91,9 +91,23 @@ message("patients carried forward from script 01: ", length(brca_patients))
 # counts as altered has to be fixed before any model is fitted.
 #
 # Rule, fixed here:
-#   a. Only MC3 calls with FILTER == "PASS" are used. MC3 ships non-PASS calls
-#      (wga, native_wga_mix, broad_PoN_v2, ...) and including them inflates
-#      mutation counts inconsistently across genes.
+#   a. MC3 calls with FILTER in {PASS, wga, native_wga_mix} are used.
+#
+#      CORRECTED 2026-08-28, after the first run. The rule was originally
+#      FILTER == "PASS" only, on the reasoning that non-PASS calls are lower
+#      quality. That was wrong, and the pre-specified sanity check caught it:
+#
+#        PASS only                     TP53 25.9%  PIK3CA 26.8%  PTEN 4.7%
+#        PASS + wga                    TP53 32.5%  PIK3CA 33.6%  PTEN 5.7%
+#        PASS + wga + native_wga_mix   TP53 34.1%  PIK3CA 34.4%  PTEN 5.9%
+#        published TCGA-BRCA           TP53  ~33%  PIK3CA  ~36%  PTEN  ~5%
+#
+#      `wga` is 30,999 of 134,835 BRCA calls. It flags samples that were
+#      WHOLE-GENOME AMPLIFIED - a property of the sample, not evidence that the
+#      call is wrong - so excluding it drops real mutations from those patients
+#      systematically, and does so unevenly across genes. `native_wga_mix` is
+#      the same thing. Genuine call-quality filters (broad_PoN_v2, StrandBias,
+#      common_in_exac, nonpreferredpair) remain excluded.
 #   b. A gene is MUTATED in a patient if it carries at least one call in
 #      MUT_NONSILENT below. Silent, UTR, flank, intron and IGR are excluded.
 #   c. PTEN_ALTERED = PTEN mutated OR GISTIC deep deletion (-2). PTEN is lost by
@@ -108,6 +122,8 @@ message("patients carried forward from script 01: ", length(brca_patients))
 # (H1047R/E545K/E542K). Cleaner biologically, but the plan's stratum is
 # "PIK3CA-wild-type / PTEN-intact" as a whole, and a hotspot-only rule would put
 # non-hotspot mutants into the wild-type arm, which is the wrong error to make.
+
+MC3_FILTER_KEEP <- c("PASS", "wga", "native_wga_mix")
 
 MUT_NONSILENT <- c(
   "Missense_Mutation", "Nonsense_Mutation", "Frame_Shift_Del", "Frame_Shift_Ins",
@@ -141,8 +157,9 @@ message("   FILTER values present: ",
         paste(sprintf("%s=%d", names(sort(table(maf$FILTER), decreasing = TRUE))[1:3],
                       sort(table(maf$FILTER), decreasing = TRUE)[1:3]), collapse = " "))
 
-maf_pass <- maf[FILTER == "PASS" & Variant_Classification %in% MUT_NONSILENT]
-message("   PASS + non-silent calls: ", format(nrow(maf_pass), big.mark = ","))
+maf_pass <- maf[FILTER %in% MC3_FILTER_KEEP & Variant_Classification %in% MUT_NONSILENT]
+message("   kept FILTER values: ", paste(MC3_FILTER_KEEP, collapse = ", "))
+message("   kept + non-silent calls: ", format(nrow(maf_pass), big.mark = ","))
 message("   patients with any such call: ", length(unique(maf_pass$patient)))
 
 mut_status <- tibble::tibble(patient = brca_patients)
@@ -159,6 +176,20 @@ for (g in c(STRATUM_GENES, EXTRA_GENES)) {
 # Patients with NO MC3 coverage must not be scored as wild-type. Absence of a
 # call is not evidence of absence of a mutation if the patient was never
 # sequenced, so they are marked NA rather than FALSE.
+# Sanity bound on the two strata that carry H2 and H3. These are well-established
+# frequencies; landing far outside them means the FILTER or non-silent rule is
+# wrong, which is exactly what happened on the first run.
+.freq <- function(g) 100 * sum(mut_status[[paste0(g, "_mut")]], na.rm = TRUE) /
+                     sum(!is.na(mut_status[[paste0(g, "_mut")]]))
+if (.freq("TP53") < 28 || .freq("TP53") > 40 ||
+    .freq("PIK3CA") < 28 || .freq("PIK3CA") > 42) {
+  warning("mutation frequencies are outside the expected TCGA-BRCA range ",
+          sprintf("(TP53 %.1f%%, PIK3CA %.1f%%; expected ~33%% and ~36%%). ",
+                  .freq("TP53"), .freq("PIK3CA")),
+          "Check MC3_FILTER_KEEP and MUT_NONSILENT before using these strata.",
+          call. = FALSE)
+}
+
 covered <- brca_patients %in% unique(maf$patient)
 message("\n   patients with MC3 coverage: ", sum(covered), " of ", length(covered))
 if (any(!covered)) {
@@ -278,7 +309,7 @@ genomics <- list(
   leukocyte   = leukocyte,
   aneuploidy  = aneuploidy,
   rppa        = rppa_mat,
-  rules       = list(nonsilent = MUT_NONSILENT, filter = "PASS",
+  rules       = list(nonsilent = MUT_NONSILENT, filter = MC3_FILTER_KEEP,
                      stratum_genes = STRATUM_GENES, extra_genes = EXTRA_GENES),
   built       = Sys.time()
 )
