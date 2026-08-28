@@ -69,9 +69,11 @@ PATH_G1CORR  <- file.path(DIR_RESULTS, "g1_correlation_criterion.rds")
 #
 # If the API route keeps failing on truncated chunks, the robust alternative is
 # the GDC Data Transfer Tool: install gdc-client, then add method = "client".
-.fetch_gdc <- function(query, dest, per_chunk) {
+.fetch_gdc <- function(query, dest, per_chunk, timeout_s) {
   old_wd <- setwd(dest)                    # setwd() returns the PREVIOUS wd
   on.exit(setwd(old_wd), add = TRUE)
+  old_to <- options(timeout = timeout_s)
+  on.exit(options(old_to), add = TRUE)
   TCGAbiolinks::GDCdownload(query, directory = "GDCdata",
                             files.per.chunk = per_chunk)
   TCGAbiolinks::GDCprepare(query, directory = "GDCdata")
@@ -81,6 +83,17 @@ PATH_G1CORR  <- file.path(DIR_RESULTS, "g1_correlation_criterion.rds")
 # single truncated stream throws the whole chunk away and re-downloads it.
 # 50 files is roughly 200 MB, so a failure costs a fifth as much.
 GDC_FILES_PER_CHUNK <- 50L
+
+# THE ONE THAT ACTUALLY MATTERS. R's default download timeout is 60 SECONDS,
+# which no multi-GB download can meet. It presents as
+#   "truncated gzip input: Unknown error: -1"
+# followed, after TCGAbiolinks' retry also times out, by
+#   "Error in if (ret == 1) ... : argument is of length zero"
+# The giveaway that it is a clock and not a size limit: the first run truncated
+# at 63 MB and the retry at 140 MB. A size cap fails at the same point every
+# time; a wall-clock timeout fails wherever the transfer has reached.
+# Set generously - this is a ceiling, not a delay.
+GDC_TIMEOUT_SECONDS <- 14400L   # 4 hours
 
 if (file.exists(PATH_SE)) {
   message("1. cached SummarizedExperiment found, skipping download")
@@ -93,7 +106,7 @@ if (file.exists(PATH_SE)) {
     data.type     = "Gene Expression Quantification",
     workflow.type = "STAR - Counts"
   )
-  se <- .fetch_gdc(q, DIR_TCGA_RAW, GDC_FILES_PER_CHUNK)
+  se <- .fetch_gdc(q, DIR_TCGA_RAW, GDC_FILES_PER_CHUNK, GDC_TIMEOUT_SECONDS)
   saveRDS(se, PATH_SE)
   message("   cached to ", PATH_SE)
 }
