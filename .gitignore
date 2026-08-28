@@ -17,3 +17,12 @@ Icon?
 
 # OmnipathR writes a log dir into the working directory on load
 omnipathr-log/
+
+# GDC download artefacts. TCGAbiolinks writes chunk tarballs, per-file UUID
+# directories and MANIFEST.txt into the WORKING directory, not into its
+# `directory` argument. Script 01 now fences the download inside
+# data/raw/tcga_brca_expression/, but this is insurance against a stray run.
+/GDCdata/
+/MANIFEST.txt
+/*.tar.gz
+/????????-????-????-????-????????????/

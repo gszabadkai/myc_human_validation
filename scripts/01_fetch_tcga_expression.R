@@ -57,19 +57,43 @@ PATH_G1CORR  <- file.path(DIR_RESULTS, "g1_correlation_criterion.rds")
 # GDCdownload writes into a GDCdata/ directory under the working directory.
 # It is pointed at data/raw/ explicitly so nothing lands in the repo root.
 
+# TCGAbiolinks' `directory` argument controls only where the FINAL per-file
+# folders are placed. It writes its chunk tarballs, the extracted UUID
+# directories and MANIFEST.txt into getwd() regardless. Run from the project
+# root, that fills the repo root with hundreds of UUID folders and a multi-
+# hundred-MB tarball. So the download is fenced inside its own directory and the
+# working directory is restored on exit, including on error.
+#
+# The download is resumable: GDCdownload skips files already present, so an
+# interrupted run continues rather than starting over.
+#
+# If the API route keeps failing on truncated chunks, the robust alternative is
+# the GDC Data Transfer Tool: install gdc-client, then add method = "client".
+.fetch_gdc <- function(query, dest, per_chunk) {
+  old_wd <- setwd(dest)                    # setwd() returns the PREVIOUS wd
+  on.exit(setwd(old_wd), add = TRUE)
+  TCGAbiolinks::GDCdownload(query, directory = "GDCdata",
+                            files.per.chunk = per_chunk)
+  TCGAbiolinks::GDCprepare(query, directory = "GDCdata")
+}
+
+# Small chunks on purpose. The default packs ~1 GB into one tarball, and a
+# single truncated stream throws the whole chunk away and re-downloads it.
+# 50 files is roughly 200 MB, so a failure costs a fifth as much.
+GDC_FILES_PER_CHUNK <- 50L
+
 if (file.exists(PATH_SE)) {
   message("1. cached SummarizedExperiment found, skipping download")
   se <- readRDS(PATH_SE)
 } else {
-  message("1. querying GDC (this downloads several GB; it runs once)")
+  message("1. querying GDC (~5.2 GB over ~1231 files; resumable, runs once)")
   q <- TCGAbiolinks::GDCquery(
     project       = "TCGA-BRCA",
     data.category = "Transcriptome Profiling",
     data.type     = "Gene Expression Quantification",
     workflow.type = "STAR - Counts"
   )
-  TCGAbiolinks::GDCdownload(q, directory = file.path(DIR_TCGA_RAW, "GDCdata"))
-  se <- TCGAbiolinks::GDCprepare(q, directory = file.path(DIR_TCGA_RAW, "GDCdata"))
+  se <- .fetch_gdc(q, DIR_TCGA_RAW, GDC_FILES_PER_CHUNK)
   saveRDS(se, PATH_SE)
   message("   cached to ", PATH_SE)
 }
