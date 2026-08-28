@@ -52,7 +52,7 @@
 # =============================================================================
 # RUNTIME AND DISK - read before sourcing
 # =============================================================================
-# Section 8 (the expression-matched null) is the expensive part: 18 arms x 2,000
+# Section 8 (the expression-matched null) is the expensive part: 17 arms x 2,000
 # matched random gene sets, GSVA-scored. Expect roughly 20-40 minutes and
 # somewhere around 0.5-1 GB under results/mito_null/. The work is cached per
 # arm and the section is resumable - re-sourcing skips arms whose cache file
@@ -78,6 +78,14 @@ message("\n07: mitochondrial axes, specificity battery, matched null\n",
 # (myc_mouse/scripts/43_substrate_specificity_and_tradeoff.R, NSET and NBIN).
 G7_NULL_NSETS <- 2000L
 G7_NULL_NBIN  <- 20L
+
+# Ventile matching is coarse, and a set whose genes sit at the extreme edge of
+# the top ventile is not actually matched by a draw from that ventile. This is
+# the guard that says so out loud: the median member-gene abundance of an arm
+# and of its draws must agree within this factor, or the percentile is measuring
+# the abundance mismatch rather than the biology. See G7_NULL_SKIP below for the
+# one set that fails it by construction.
+G7_NULL_MAX_ABUNDANCE_RATIO <- 2
 
 # Minimum genes present in the matrix for a set to be scored at all. mitoPPS
 # uses 3, matching the mouse pathway universe. GSVA uses 3 as well, because the
@@ -325,7 +333,8 @@ arms_spec <- tibble::tibble(
     "FAO - see the Lee et al. caveat in this section",
     "one-carbon metabolism",
     "one-carbon metabolism",
-    "standing convention, expression-scale skew")
+    "standing convention, expression-scale skew"),
+  null_tested = c(rep(TRUE, 12L), FALSE)
 )
 
 # THE FAO ARM CARRIES A PRE-STATED CAVEAT, fixed before the result is seen.
@@ -796,7 +805,36 @@ by_bin <- split(names(bin_of), bin_of)
   }), use.names = FALSE)
 }
 
-null_arms <- rownames(gsva_arms)
+# THE mtDNA ARM IS SCORED AND REPORTED BUT NOT NULL-TESTED.
+# The 13 mtDNA-encoded genes are removed from every nuclear set above, which is
+# the standing convention and is what "held separately" in plan section 2 means.
+# They are ALSO kept as a pathway of the mitoPPS universe, because the mouse
+# keeps them there (myc_mouse/scripts/08_mitoPPS_analysis.R PART 2b) and this
+# instrument's value is fidelity to the one the mouse fitted on.
+#
+# What they are NOT is a specificity arm. The mouse's own battery
+# (myc_mouse/scripts/43) has no mtDNA arm, the RESOLVED proposal's arm table has
+# no mtDNA row, and the expression-matched null CANNOT be built for them:
+#
+#   all 13 sit in ventile 20 of 20, and 8 of them are in the 20 most abundant
+#   genes of the whole 18,115-gene matrix - MT-CO1 is rank 1, MT-ND4 rank 2.
+#   The median mtDNA gene is 11.5x the median gene of the ventile it would be
+#   matched against, and the 13 of them carry 4.9% of the total signal.
+#
+# So a "matched" draw from ventile 20 would substitute genes an order of
+# magnitude less abundant, and the resulting percentile would report the
+# abundance gap, not the biology. That is the same property - different baseline
+# and different regulation from the nuclear-encoded subunits - that makes them
+# worth holding separately in the first place.
+#
+# They stay on all four instruments and in every summary table, so the
+# mtDNA-versus-nuclear comparison is available; it is reported descriptively,
+# without a percentile.
+G7_NULL_SKIP <- "mtDNA-encoded OXPHOS"
+
+null_arms <- setdiff(rownames(gsva_arms), G7_NULL_SKIP)
+message("   null-tested arms: ", length(null_arms), " of ", nrow(gsva_arms),
+        "; not null-tested: ", paste(G7_NULL_SKIP, collapse = ", "))
 
 null_manifest <- dplyr::bind_rows(lapply(seq_along(null_arms), function(ai) {
   a    <- null_arms[[ai]]
@@ -808,7 +846,8 @@ null_manifest <- dplyr::bind_rows(lapply(seq_along(null_arms), function(ai) {
     message(sprintf("   [%2d/%2d] %-26s cached (%d draws)",
                     ai, length(null_arms), a, nrow(n$gsva)))
     return(tibble::tibble(arm = a, file = f, n_sets = nrow(n$gsva),
-                          n_genes = length(n$genes), seed = seed, rebuilt = FALSE))
+                          n_genes = length(n$genes), seed = seed,
+                          abundance_ratio = n$abundance_ratio, rebuilt = FALSE))
   }
 
   t0    <- Sys.time()
@@ -843,14 +882,34 @@ null_manifest <- dplyr::bind_rows(lapply(seq_along(null_arms), function(ai) {
   dimnames(Sq) <- list(null_names, colnames(L))
   m <- .mitopps_query(Sq, .arm_universe(a))
 
-  saveRDS(list(arm = a, genes = genes, seed = seed, draws = draws,
-               gsva = g, mitopps = m, built = Sys.time()), f)
+  # --- did the ventiles actually match this arm?
+  # Ventile membership is not the same as comparable abundance. Checked per arm
+  # rather than assumed, because the one set where it fails is the set whose
+  # failure is least visible.
+  obs_ab  <- stats::median(gene_mean_lin[genes])
+  null_ab <- stats::median(vapply(draws, function(gg)
+    stats::median(gene_mean_lin[gg]), numeric(1)))
+  ab_ratio <- obs_ab / null_ab
+  if (!is.finite(ab_ratio) ||
+      ab_ratio > G7_NULL_MAX_ABUNDANCE_RATIO ||
+      ab_ratio < 1 / G7_NULL_MAX_ABUNDANCE_RATIO) {
+    warning("arm '", a, "': median member-gene abundance is ",
+            signif(ab_ratio, 3), "x that of its matched draws, outside the ",
+            G7_NULL_MAX_ABUNDANCE_RATIO, "x guard. The ventiles have not ",
+            "matched this arm and its percentile will partly report the ",
+            "abundance gap. Do not quote it without saying so.", call. = FALSE)
+  }
 
-  message(sprintf("   [%2d/%2d] %-26s %4d draws, %3d genes, %.1f min",
+  saveRDS(list(arm = a, genes = genes, seed = seed, draws = draws,
+               gsva = g, mitopps = m, abundance_ratio = ab_ratio,
+               built = Sys.time()), f)
+
+  message(sprintf("   [%2d/%2d] %-26s %4d draws, %3d genes, match %.2fx, %.1f min",
                   ai, length(null_arms), a, G7_NULL_NSETS, length(genes),
-                  as.numeric(difftime(Sys.time(), t0, units = "mins"))))
+                  ab_ratio, as.numeric(difftime(Sys.time(), t0, units = "mins"))))
   tibble::tibble(arm = a, file = f, n_sets = G7_NULL_NSETS,
-                 n_genes = length(genes), seed = seed, rebuilt = TRUE)
+                 n_genes = length(genes), seed = seed,
+                 abundance_ratio = ab_ratio, rebuilt = TRUE)
 }))
 
 message("   null cache: ", nrow(null_manifest), " arms under results/mito_null/")
@@ -911,6 +970,10 @@ mito <- list(
     mtdna = paste(EXPECT_MITOCARTA_MTDNA, "mtDNA-encoded genes held in", MTDNA_PATHWAY),
     null  = paste0(G7_NULL_NSETS, " sets per arm, matched within ", G7_NULL_NBIN,
                    " ventiles of mean linear expression, drawn without replacement"),
+    null_skipped = paste(G7_NULL_SKIP, "- scored and reported on all four",
+                         "instruments but NOT null-tested; its genes are the",
+                         "most abundant in the matrix and no ventile-matched",
+                         "draw stands in for them"),
     apoptosis_arms = paste("mouse Apoptosis-PRO/ANTI NOT added to the mitoPPS",
                            "universe - see section 5.1, NEEDS SIGN-OFF")
   ),
