@@ -26,8 +26,9 @@
   "GSVA", "DESeq2", "limma", "decoupleR", "msigdbr", "survival", "data.table"
 )
 
-# Needed by scripts 01 and 02 only. Recorded, not fatal here: gates G1 and G2
-# do not touch TCGA expression or genomics.
+# Needed by scripts 01, 02 and 03 only. Warned about rather than fatal, so the
+# gate scripts still run in an environment without it. Installed 2026-08-28
+# (TCGAbiolinks 2.40.0); the warning path is kept for a fresh checkout.
 .pkg_deferred <- c("TCGAbiolinks")
 
 .check_packages <- function(pkgs, tier) {
