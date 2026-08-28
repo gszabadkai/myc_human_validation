@@ -38,7 +38,7 @@ Four sheets:
 | 1 | `Description` | - | Release notes |
 | 2 | `A Human MitoCarta3.0` | 1,136 | The inventory. 1,136 unique symbols, 13 `MT-` prefixed |
 | 3 | `B Human All Genes` | - | Full genome background with scoring columns |
-| 4 | `C MitoPathways` | 154 | Pathway hierarchy; columns `MitoPathway`, `MitoPathways Hierarchy`, `Genes` |
+| 4 | `C MitoPathways` | 154 rows / **149 pathways** | Pathway hierarchy; columns `MitoPathway`, `MitoPathways Hierarchy`, `Genes`. The last 5 rows are blank padding |
 
 Sheet 2 columns of interest: `HumanGeneID`, `MouseOrthologGeneID`, `Symbol`, `Synonyms`,
 `Description`, `MitoCarta3.0_List`.
@@ -68,14 +68,21 @@ subunits - expression-scale skew. See `CLAUDE.md`.
 - **Sheet 4 has a leading unnamed index column.** `readxl` names it `"2"`, so
   `pw[[1]]` is a row number, not a pathway name. Address columns by name:
   `MitoPathway`, `MitoPathways Hierarchy`, `Genes`. Sheet 4 is 154 x 4.
+- **Sheet 4 ends with 5 entirely blank padding rows.** 154 rows, 149 real
+  pathways. Drop them at load with `filter(!is.na(MitoPathway))`. Leaving them
+  in corrupts results two ways, and only one is loud: `MitoPathway == "OXPHOS"`
+  returns 1 TRUE and 5 NA, so logical subsetting yields 6 elements (loud), and
+  `strsplit()` then turns each NA into a phantom `"NA"` gene, inflating every
+  pathway by exactly 5 (silent). Use `which()` for lookups - it is NA-safe.
 - **`Genes` is a single comma-space-separated string per pathway**, not a list column.
   Split on `", "` before use.
 - **`MitoPathways Hierarchy` encodes the tree with `>` separators**, e.g.
   `"Mitochondrial central dogma > mtDNA maintenance > mtDNA replication"`. Parent and
-  child rows both exist, so pathway sets overlap by construction - do not treat the 154
-  rows as disjoint.
-- Relevant `MitoPathway` values for this project include `OXPHOS`, `OXPHOS subunits`,
-  `OXPHOS assembly factors`, and `Complex I` through `Complex V`. Note the plan's
-  primary OXPHOS measure is the *subunit* set, not the `OXPHOS` umbrella, which also
-  contains assembly factors.
+  child rows both exist, so pathway sets overlap by construction - do not treat the 149
+  pathways as disjoint.
+- Relevant `MitoPathway` values for this project include `OXPHOS` (169 genes),
+  `OXPHOS subunits` (102), `OXPHOS assembly factors`, and `Complex I` through
+  `Complex V`. Note the plan's primary OXPHOS measure is the *subunit* set, not the
+  `OXPHOS` umbrella, which also contains assembly factors. Those two counts are
+  post-padding-row-removal; with the blank rows left in they read as 174 and 107.
 - `readxl::read_xls()` emits benign column-type warnings on sheets 2 and 3.

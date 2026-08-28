@@ -96,7 +96,7 @@ here, do not edit them in place. If a source changes, re-snapshot rather than pa
 
 | Input | Location | Source |
 |---|---|---|
-| Human MitoCarta 3.0 | `data/mitocarta_human/` | Broad, `Human.MitoCarta3.0.xls`, 1,136 genes / 154 pathways |
+| Human MitoCarta 3.0 | `data/mitocarta_human/` | Broad, `Human.MitoCarta3.0.xls`, 1,136 genes / 149 pathways |
 | CollecTRI regulons | `data/collectri_human/` | OmniPath web service, dated snapshot, 1,201 TFs |
 | Felsher MYC signature | `data/genesets_from_library_human/` | `mammary_geneset_library` tag `v1.0` (`cbd8f16d…`), 67 genes |
 

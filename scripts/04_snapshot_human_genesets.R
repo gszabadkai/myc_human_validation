@@ -57,14 +57,28 @@ mitocarta_background <- suppressWarnings(
 )
 # Sheet 4 carries a leading unnamed index column that readxl names "2".
 # Address columns by name, never by position. See the MitoCarta README.
-mitocarta_pathways <- suppressWarnings(
+mitocarta_pathways_raw <- suppressWarnings(
   readxl::read_xls(PATH_MITOCARTA, sheet = 4)
 )
 
+# Sheet 4 ends with 5 entirely blank padding rows (all-NA). They must be dropped
+# at load, not defended against at each lookup, because they corrupt results two
+# ways and only one of them is loud:
+#   - `MitoPathway == "OXPHOS"` yields 1 TRUE and 5 NA, so logical subsetting
+#     returns 6 elements and a uniqueness check fails (loud)
+#   - strsplit() then turns each NA into a phantom "NA" gene, inflating every
+#     pathway by exactly 5 (silent, and the reason OXPHOS was first miscounted
+#     as 174 rather than 169)
+mitocarta_pathways <- mitocarta_pathways_raw %>%
+  dplyr::filter(!is.na(MitoPathway))
+
 stopifnot(
-  nrow(mitocarta_inventory)  == EXPECT_MITOCARTA_GENES,
-  nrow(mitocarta_background) == EXPECT_MITOCARTA_BACKGRD,
-  nrow(mitocarta_pathways)   == EXPECT_MITOCARTA_PATHWAYS,
+  nrow(mitocarta_inventory)     == EXPECT_MITOCARTA_GENES,
+  nrow(mitocarta_background)    == EXPECT_MITOCARTA_BACKGRD,
+  nrow(mitocarta_pathways_raw)  == EXPECT_MITOCARTA_PATHWAY_ROWS,
+  nrow(mitocarta_pathways)      == EXPECT_MITOCARTA_PATHWAYS,
+  !anyNA(mitocarta_pathways$Genes),
+  !anyDuplicated(mitocarta_pathways$MitoPathway),
   all(c("Symbol", "Synonyms") %in% colnames(mitocarta_background)),
   all(c("MitoPathway", "Genes") %in% colnames(mitocarta_pathways))
 )
@@ -182,18 +196,20 @@ current_symbols  <- unique(mitocarta_background$Symbol)
 .split_genes <- function(x) trimws(unlist(strsplit(x, ",", fixed = TRUE)))
 
 .pathway_genes <- function(name) {
-  row <- mitocarta_pathways$Genes[mitocarta_pathways$MitoPathway == name]
-  if (length(row) != 1L) {
+  # which() rather than logical subsetting: NA-safe by construction, so this
+  # cannot silently re-acquire the padding-row bug if the sheet changes.
+  i <- which(mitocarta_pathways$MitoPathway == name)
+  if (length(i) != 1L) {
     stop("MitoPathway not found, or not unique: ", name, call. = FALSE)
   }
-  .split_genes(row)
+  .split_genes(mitocarta_pathways$Genes[i])
 }
 
 # --- Reference sets ----------------------------------------------------------
 # MITOCARTA_ALL is the strip set. The OXPHOS sets are diagnostics: the umbrella
-# includes assembly factors, the subunit set does not. Plan section 7.2 uses the
-# SUBUNIT set as the primary OXPHOS measure, so that is the circularity-relevant
-# number. They are reported separately and never conflated.
+# (169 genes) includes assembly factors, the subunit set (102) does not. Plan
+# section 7.2 uses the SUBUNIT set as the primary OXPHOS measure, so that is the
+# circularity-relevant number. Reported separately and never conflated.
 ref_sets <- list(
   MITOCARTA_ALL             = unique(mitocarta_inventory$Symbol),
   MITOCARTA_OXPHOS_UMBRELLA = .pathway_genes("OXPHOS"),

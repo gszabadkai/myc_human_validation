@@ -106,9 +106,12 @@ invisible(lapply(c(DIR_RESULTS, DIR_OUTPUTS, DIR_TABLES), .ensure_dir))
 # a file swapped underneath the pipeline fails loudly instead of quietly
 # changing a result. If one of these legitimately changes, re-snapshot and
 # update BOTH the README and this block.
-EXPECT_MITOCARTA_GENES    <- 1136L   # Sheet 2, "A Human MitoCarta3.0"
-EXPECT_MITOCARTA_PATHWAYS <- 154L    # Sheet 4, "C MitoPathways"
-EXPECT_MITOCARTA_BACKGRD  <- 19247L  # Sheet 3, "B Human All Genes"
+EXPECT_MITOCARTA_GENES        <- 1136L   # Sheet 2, "A Human MitoCarta3.0"
+EXPECT_MITOCARTA_BACKGRD      <- 19247L  # Sheet 3, "B Human All Genes"
+# Sheet 4 ends with 5 entirely blank padding rows. Both numbers are asserted:
+# the raw row count catches a swapped file, the pathway count is the real one.
+EXPECT_MITOCARTA_PATHWAY_ROWS <- 154L    # Sheet 4 raw, incl. 5 blank rows
+EXPECT_MITOCARTA_PATHWAYS     <- 149L    # Sheet 4 after dropping the blanks
 EXPECT_MITOCARTA_MTDNA    <- 13L     # MT- prefixed protein-coding
 EXPECT_FELSHER_GENES      <- 67L
 EXPECT_COLLECTRI_ROWS     <- 64723L
