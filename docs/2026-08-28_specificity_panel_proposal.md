@@ -201,6 +201,37 @@ would not be defensible.
 
 ## 7. Where `GS_metabolic` fits
 
+> **CORRECTED 2026-08-28, after script 07's first run. Item 7 below is wrong on
+> its central factual claim, and the correction is recorded rather than the text
+> rewritten.**
+>
+> This section asserts that MitoCarta gives no complex-level resolution. It does.
+> Sheet 4 carries `OXPHOS > Complex N > CN subunits / CN assembly factors` for
+> all five complexes - `CI subunits` 44, `CII` 4, `CIII` 10, `CIV` 21, `CV` 21 -
+> nesting exactly inside `OXPHOS subunits`. I asserted the absence from the
+> section-1 pathway list without reading the hierarchy column.
+>
+> The substitute was not merely unnecessary, it was wrong. **The curated `ATPase`
+> class is `ATP13A1-ATP13A5`, the P5-type cation-transporting ATPases; it
+> contains no ATP synthase subunit at all.** Script 07's first run gave that arm
+> a correlation of 0.04 with OXPHOS subunits and -0.04 with Complex IV, which is
+> what exposed it. Curated Complex III also lost `UCRC` and `UQCR` to legacy
+> symbols (20% of the set), Complex I lost `NDUFA4L`, and Complex IV writes its
+> mtDNA subunits `COX1/COX2/COX3` so the mtDNA strip missed them.
+>
+> **Item 7 of the agreed table is therefore superseded**: the per-complex sets
+> come from MitoCarta. `GS_metabolic` keeps its snapshot and its wider metabolic
+> classifications, and script 07 reports it against MitoCarta as an independent
+> second opinion on every run - the check that would have caught this before it
+> was scored.
+>
+> A related landmine found in the same run, recorded because the fix is
+> counter-intuitive: resolving unmatched symbols through synonyms in REVERSE
+> (symbol-as-alias) would map `COX1 -> PTGS1` and `COX2 -> PTGS2`, injecting the
+> prostaglandin synthases into an OXPHOS set. Script 07 deliberately does not do
+> it; unresolved symbols are named in the report instead.
+
+
 `data/raw/user_curated/GS_metabolic_genes_list.xlsx` in the geneset library is
 tracked and tag-pinned (blob `21f79d9a...` at `v1.0`) and has a **native `human`
 sheet** - 2,348 genes, 74 classifications, human symbols with Entrez ids. The
@@ -248,7 +279,7 @@ Current text rejects the library's human GMT tree. Add, immediately after it:
 | 4 | `Carnitine shuttle` merged into FAO; FAO/Lee caveat pre-stated | plan section 2 |
 | 5 | 2,000 expression-matched random sets as the null | plan section 2 |
 | 6 | **Both instruments co-primary**; claim only what both support | plan section 7.2, CLAUDE.md |
-| 7 | `GS_metabolic` human sheet snapshotted, complex-level only | `data/genesets_metabolic_human/` |
+| 7 | ~~`GS_metabolic` human sheet, complex-level~~ **SUPERSEDED 2026-08-28** - per-complex sets come from MitoCarta; `GS_metabolic` is an independent second opinion, reported not used | `data/genesets_metabolic_human/` |
 | 8 | CLAUDE.md amendment - the rejection is of `outputs/gmt/human/`, not the library | CLAUDE.md |
 
 Nothing here is open. Script 07 can be written.

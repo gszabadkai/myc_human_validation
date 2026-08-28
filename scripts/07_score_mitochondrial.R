@@ -208,6 +208,20 @@ stopifnot(length(hm_e2f) == 200L, length(hm_g2m) == 200L)
 # match, exactly as before, and it is reported by name rather than dropped
 # silently.
 #
+# WHY THE MAP IS NOT ALSO RUN IN REVERSE. The obvious extension is to treat an
+# unmatched symbol as an ALIAS and resolve it to the MitoCarta symbol it belongs
+# to. Tested against this data on 2026-08-28, it is dangerous:
+#
+#   COX1 -> PTGS1     COX2 -> PTGS2     COX3 -> PTGS1     PRODH2 -> PRODH
+#
+# all four of those targets present in the matrix. A curated Complex IV list
+# writes the mtDNA cytochrome oxidase subunits as COX1/COX2/COX3; a reverse
+# lookup resolves them to the PROSTAGLANDIN SYNTHASES - pharmacology's COX-1 and
+# COX-2 - and injects two abundant inflammatory genes into an OXPHOS set,
+# invisibly. PRODH2 is a different gene from PRODH. Leaving a symbol unresolved
+# and NAMING it in the report is the safe behaviour, and the report is where a
+# genuine loss gets caught.
+#
 # ONE map is built over the union of every symbol used anywhere in this script,
 # and applied to each collection separately. Building it per collection would be
 # wrong here: several arm names are also MitoPathway names, and the merged
@@ -311,7 +325,12 @@ ARM_PATHWAYS <- list(
   "Fatty acid oxidation"     = c("Fatty acid oxidation", "Carnitine shuttle"),
   "Folate and 1-C"           = "Folate and 1-C metabolism",
   "Glycine metabolism"       = "Glycine metabolism",
-  "mtDNA-encoded OXPHOS"     = MTDNA_PATHWAY
+  "mtDNA-encoded OXPHOS"     = MTDNA_PATHWAY,
+  "CI subunits"              = "CI subunits",
+  "CII subunits"             = "CII subunits",
+  "CIII subunits"            = "CIII subunits",
+  "CIV subunits"             = "CIV subunits",
+  "CV subunits"              = "CV subunits"
 )
 
 arms_spec <- tibble::tibble(
@@ -319,7 +338,8 @@ arms_spec <- tibble::tibble(
   pathways = vapply(ARM_PATHWAYS, paste, character(1), collapse = " + "),
   role = c("claim", "reported", "primary negative", "negative", "negative",
            "negative", "negative", "negative", "negative", "negative",
-           "negative", "negative", "held separate"),
+           "negative", "negative", "held separate",
+           rep("complex resolution", 5L)),
   alternative_answered = c(
     "-",
     "includes assembly factors; not the primary measure",
@@ -333,8 +353,9 @@ arms_spec <- tibble::tibble(
     "FAO - see the Lee et al. caveat in this section",
     "one-carbon metabolism",
     "one-carbon metabolism",
-    "standing convention, expression-scale skew"),
-  null_tested = c(rep(TRUE, 12L), FALSE)
+    "standing convention, expression-scale skew",
+    rep("does OXPHOS move across ALL complexes, as the mouse claims?", 5L)),
+  null_tested = c(rep(TRUE, 12L), FALSE, rep(TRUE, 5L))
 )
 
 # THE FAO ARM CARRIES A PRE-STATED CAVEAT, fixed before the result is seen.
@@ -353,45 +374,63 @@ if (length(missing_paths)) {
        call. = FALSE)
 }
 
-# --- 3c. per-complex sets, from the curated human list -----------------------
-COMPLEX_CLASSES <- c("Complex I", "Complex II", "Complex III", "Complex IV", "ATPase")
-missing_cls <- setdiff(COMPLEX_CLASSES, unique(gs_metab$classification))
-if (length(missing_cls)) {
-  stop("classification(s) absent from gs_metabolic_human.csv: ",
-       paste(missing_cls, collapse = ", "), call. = FALSE)
-}
-complex_raw <- stats::setNames(
-  lapply(COMPLEX_CLASSES,
-         function(cl) unique(gs_metab$gene_symbol[gs_metab$classification == cl])),
-  paste0("Complex-level: ", COMPLEX_CLASSES))
-# The mtDNA strip is not a formality here. The source curation is internally
-# inconsistent about mtDNA subunits - Complex I lists all seven MT-ND genes and
-# Complex III lists MT-CYB, while Complex IV lists none of MT-CO1/2/3 and ATPase
-# lists neither MT-ATP6 nor MT-ATP8. Before the strip the five sets are
-# therefore not comparable to each other at all; after it they are uniformly
-# nuclear-encoded, which is also what the standing convention requires.
-complex_sets <- lapply(complex_raw, setdiff, y = mtdna_genes)
-message("   per-complex sets, before -> after the mtDNA strip:")
-for (nm in names(complex_sets)) {
-  message(sprintf("     %-28s %3d -> %3d", nm,
-                  length(complex_raw[[nm]]), length(complex_sets[[nm]])))
-}
+# --- 3c. per-complex sets, from MitoCarta ------------------------------------
+# CORRECTED 2026-08-28, after the first run of this script. The specificity panel
+# proposal (item 7) and plan section 7.2 took the per-complex sets from
+# data/genesets_metabolic_human/ on the stated grounds that "MitoCarta has no
+# complex breakdown". That is false. MitoCarta 3.0 Sheet 4 carries a full
+# hierarchy - OXPHOS > Complex N > CN subunits / CN assembly factors - and the
+# curated substitute was wrong in a way only the diagnostics caught:
+#
+#   the curated `ATPase` class is ATP13A1-ATP13A5, the P5-type cation-transporting
+#   ATPases. Not one of them is in the ATP synthase. In the first run that arm
+#   correlated 0.04 with OXPHOS subunits and -0.04 with Complex IV, which is the
+#   fingerprint of a set measuring something else entirely.
+#
+# Three quieter losses went with it: the curated Complex III lost UCRC and UQCR -
+# 20% of the set - to legacy symbols, Complex I lost NDUFA4L, and Complex IV
+# writes its mtDNA subunits COX1/COX2/COX3 so the mtDNA strip missed them; they
+# dropped out only because they match nothing in the matrix.
+#
+# MitoCarta's own sets have none of those problems, share the vocabulary of every
+# other arm, and are universe pathways, so they take canonical mitoPPS values
+# rather than query-mode ones. They are listed in ARM_PATHWAYS above.
+COMPLEX_ARMS <- c("CI subunits", "CII subunits", "CIII subunits",
+                  "CIV subunits", "CV subunits")
 
-# Cross-check against MitoCarta, which is an independent curation of the same
-# biology. The five complexes should very nearly exhaust the nuclear-encoded
-# OXPHOS subunits, and a large disagreement means one of the two lists is not
-# what this script assumes it is.
-cx_union <- unique(unlist(complex_sets, use.names = FALSE))
-ox_nuc   <- setdiff(mito_paths[["OXPHOS subunits"]], mtdna_genes)
+# The complexes must nest inside the claim arm. Union is 100 of the 102 OXPHOS
+# subunits; the two that belong to no complex are CYCS and HCCS, which are
+# cytochrome c and its synthase rather than subunits of anything.
+cx_union <- unique(unlist(mito_paths[COMPLEX_ARMS], use.names = FALSE))
+ox_sub   <- mito_paths[["OXPHOS subunits"]]
+outside  <- setdiff(cx_union, ox_sub)
+if (length(outside)) {
+  stop("per-complex subunits sitting outside `OXPHOS subunits`: ",
+       paste(outside, collapse = ", "),
+       ". One of the two sets is not what this script takes it to be.",
+       call. = FALSE)
+}
 message(sprintf(
-  paste("   complexes pooled: %d genes vs MitoCarta nuclear OXPHOS subunits",
-        "%d;\n     %d shared, %d curated-only, %d MitoCarta-only"),
-  length(cx_union), length(ox_nuc), length(intersect(cx_union, ox_nuc)),
-  length(setdiff(cx_union, ox_nuc)), length(setdiff(ox_nuc, cx_union))))
-if (length(intersect(cx_union, ox_nuc)) < 0.7 * length(ox_nuc)) {
-  stop("the per-complex sets and MitoCarta's OXPHOS subunits agree on fewer ",
-       "than 70% of genes. One of the two lists is not what it is taken to be; ",
-       "do not proceed on a per-complex claim.", call. = FALSE)
+  "   per-complex subunits: %d genes nested inside OXPHOS subunits (%d);\n     in no complex: %s",
+  length(cx_union), length(ox_sub),
+  paste(setdiff(ox_sub, cx_union), collapse = ", ")))
+
+# The curated human metabolic list is kept as an INDEPENDENT SECOND OPINION and
+# is reported, never used. This is the comparison that would have caught the
+# ATPase error before it was scored, so it is now permanent rather than a
+# one-off. `ATPase` is expected to disagree completely; that line is the record.
+CURATED_MAP <- c("CI subunits"   = "Complex I",   "CII subunits" = "Complex II",
+                 "CIII subunits" = "Complex III", "CIV subunits" = "Complex IV",
+                 "CV subunits"   = "ATPase")
+message("   second opinion, curated GS_metabolic vs MitoCarta (reported, not used):")
+for (a in names(CURATED_MAP)) {
+  cu <- setdiff(unique(gs_metab$gene_symbol[
+    gs_metab$classification == CURATED_MAP[[a]]]), mtdna_genes)
+  mc <- mito_paths[[a]]
+  ov <- length(intersect(cu, mc))
+  message(sprintf("     %-14s vs %-12s MitoCarta %2d, curated %2d, shared %2d%s",
+                  a, CURATED_MAP[[a]], length(mc), length(cu), ov,
+                  if (ov < 0.5 * min(length(mc), length(cu))) "   <- DISAGREE" else ""))
 }
 
 # --- 3d. the D7 proliferation covariates -------------------------------------
@@ -411,12 +450,10 @@ message("   PROLIF_STD ", length(PROLIF_STD), ", PROLIF_DISJOINT ",
         length(PROLIF_DISJOINT), " (D7's 9 shared genes confirmed by name)")
 
 # --- 3e. assemble and harmonise ----------------------------------------------
-arm_sets <- c(
-  stats::setNames(lapply(ARM_PATHWAYS,
-                         function(p) unique(unlist(mito_paths[p], use.names = FALSE))),
-                  names(ARM_PATHWAYS)),
-  complex_sets
-)
+arm_sets <- stats::setNames(
+  lapply(ARM_PATHWAYS,
+         function(p) unique(unlist(mito_paths[p], use.names = FALSE))),
+  names(ARM_PATHWAYS))
 covariate_sets <- list(PROLIF_STD = PROLIF_STD, PROLIF_DISJOINT = PROLIF_DISJOINT)
 
 sym <- .build_symbol_map(c(unlist(arm_sets, use.names = FALSE),
@@ -914,6 +951,18 @@ null_manifest <- dplyr::bind_rows(lapply(seq_along(null_arms), function(ai) {
 
 message("   null cache: ", nrow(null_manifest), " arms under results/mito_null/")
 
+# A cache file belonging to no current arm is a leftover from a previous arm
+# list. It is never read, but leaving it unmentioned would let a later reader
+# believe the battery contained an arm it did not.
+orphans <- setdiff(
+  list.files(DIR_MITO_NULL, pattern = "^null_.*[.]rds$", full.names = TRUE),
+  null_manifest$file)
+if (length(orphans)) {
+  warning(length(orphans), " stale cache file(s) in results/mito_null/ belong to ",
+          "no current arm: ", paste(basename(orphans), collapse = ", "),
+          ". Delete them.", call. = FALSE)
+}
+
 # =============================================================================
 # 9. Save
 # =============================================================================
@@ -1036,7 +1085,7 @@ if (FALSE) {
   .rho(m$gsva_arms["OXPHOS subunits", ], m$gsva_arms["OXPHOS assembly factors", ])
 
   # --- does OXPHOS move across ALL complexes, as the mouse claims? ---------
-  cx <- grep("^Complex-level", rownames(m$gsva_arms), value = TRUE)
+  cx <- m$arms$arm[m$arms$role == "complex resolution"]
   round(cor(t(m$gsva_arms[c("OXPHOS subunits", cx), ]), method = "spearman"), 2)
 
   # --- mtDNA-encoded, held separate on purpose -----------------------------

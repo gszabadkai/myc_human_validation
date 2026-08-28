@@ -546,9 +546,25 @@ and M-b disagree, report both and treat the claim as unsupported.
   separate synthetic "mtDNA-encoded OXPHOS subunits" pathway and are never pooled
   with the nuclear set (expression-scale skew).
 - **Complex-level resolution:** the mouse claim is that OXPHOS falls *across all
-  complexes*. MitoCarta's `OXPHOS subunits` is one flat list of 102, so the
-  per-complex sets come from `data/genesets_metabolic_human/` (Complex I 49,
-  II 4, III 11, IV 27, ATPase 5).
+  complexes*. **CORRECTED 2026-08-28** - the per-complex sets come from **Human
+  MitoCarta 3.0 itself**: `CI subunits` 44, `CII` 4, `CIII` 10, `CIV` 21, `CV` 21
+  (37/4/9/18/19 after the mtDNA strip). They nest exactly inside `OXPHOS
+  subunits`; the only two members of that set belonging to no complex are `CYCS`
+  and `HCCS`.
+
+  This paragraph previously routed the per-complex sets through
+  `data/genesets_metabolic_human/` on the stated grounds that MitoCarta has no
+  complex breakdown. **That premise was false** - Sheet 4 carries a full
+  `OXPHOS > Complex N > CN subunits / CN assembly factors` hierarchy - and the
+  substitute was wrong: the curated `ATPase` class is `ATP13A1-ATP13A5`, the
+  P5-type cation-transporting ATPases, with **no ATP synthase subunit in it**.
+  In script 07's first run that arm correlated 0.04 with OXPHOS subunits and
+  -0.04 with Complex IV, which is what surfaced the error. Three quieter losses
+  went with it (curated Complex III lost `UCRC` and `UQCR` to legacy symbols,
+  Complex I lost `NDUFA4L`, and Complex IV's mtDNA subunits are written
+  `COX1/COX2/COX3` so the mtDNA strip missed them). Corrected before any model
+  was fitted. The curated list stays snapshotted and is reported by script 07 as
+  an independent second opinion, never used.
 - **Specificity panel:** see the amended section 2. Arms are Human MitoCarta
   pathways matching the mouse comparators, with `OXPHOS assembly factors` as the
   primary negative and a 2,000-set expression-matched null.

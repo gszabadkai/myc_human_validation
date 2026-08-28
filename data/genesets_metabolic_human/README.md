@@ -45,23 +45,53 @@ objects; see the amended wording in CLAUDE.md.
 named in `myc_mouse/scripts/43_substrate_specificity_and_tradeoff.R`. See
 `docs/2026-08-28_specificity_panel_proposal.md`.
 
-**It is here for complex-level resolution**, which MitoCarta does not provide:
+**NOT the per-complex sets either. CORRECTED 2026-08-28.** This file was
+snapshotted to supply complex-level resolution "which MitoCarta does not
+provide". **That claim was wrong.** MitoCarta 3.0 Sheet 4 carries a full
+hierarchy - `OXPHOS > Complex N > CN subunits / CN assembly factors` - giving
+`CI subunits` 44, `CII` 4, `CIII` 10, `CIV` 21, `CV` 21, nesting exactly inside
+`OXPHOS subunits`. Script 07 uses those.
+
+**And the substitute was not merely redundant, it was wrong.** Read the members,
+not the class name:
 
 ```
-Complex I 49 | Complex II 4 | Complex III 11 | Complex IV 27
-ATPase 5     | Proton Transport 49 | Ubiquinone 13
+ATPase (n = 5)  =  ATP13A1  ATP13A2  ATP13A3  ATP13A4  ATP13A5
 ```
 
-MitoCarta's `OXPHOS subunits` is one flat list of 102 genes. The mouse claim is
-that OXPHOS subunit LFC and mitoPPS drop **across all complexes**
-(`fig2_wt_mito_contraction.R`), and testing that in human needs per-complex
-sets. This file has them.
+Those are P5-type cation-transporting ATPases - ER and lysosomal transporters,
+`ATP13A2` being the Kufor-Rakeb Parkinson gene. **Not one is a subunit of the
+mitochondrial ATP synthase.** Used as "Complex V" in script 07's first run, that
+arm correlated 0.04 with OXPHOS subunits and -0.04 with Complex IV. The real ATP
+synthase subunits are inside `Proton Transport` (49), mixed with the vacuolar
+V-ATPase (`ATP6V*`) and the uncoupling proteins, so that class is not Complex V
+either.
+
+Three further problems in the same five sets: `Complex III` writes `UCRC` and
+`UQCR` (legacy symbols for `UQCR10` and `UQCR11`) and so loses 20% of itself
+against any current annotation; `Complex I` writes `NDUFA4L`; and `Complex IV`
+writes its mtDNA subunits as `COX1/COX2/COX3`, which no `^MT-` strip catches.
+
+**Do not repair those by resolving symbols in reverse.** `COX1` and `COX3`
+resolve to `PTGS1` and `COX2` to `PTGS2` - the prostaglandin synthases,
+pharmacology's COX-1 and COX-2 - which would inject two abundant inflammatory
+genes into an OXPHOS set, invisibly. `PRODH2` resolves to `PRODH`, a different
+gene. Script 07 leaves such symbols unresolved and names them in its
+harmonisation report instead.
+
+## What it IS for
+
+**An independent second opinion, reported and never used.** Script 07 prints
+this file's five complex classes against MitoCarta's on every run - the check
+that would have caught the `ATPase` error before it was scored. The `ATPase` row
+is expected to disagree completely, and that line is the permanent record of why
+this file does not supply the sets.
 
 It also carries the wider metabolic classifications (`Fatty Acid` 139,
-`Krebs` 26, `Redox` 68, `Glutathione` 34, `Folate` 12, `Glycine` 7 ...). Those
-are **not** used for the primary battery - MitoCarta is - but they are available
-as an independent second opinion if a specificity result needs one, since they
-are a different curation of the same biology.
+`Krebs` 26, `Redox` 68, `Glutathione` 34, `Folate` 12, `Glycine` 7,
+`Proton Transport` 49, `Ubiquinone` 13 ...), which are a different curation of
+the same biology and are available if a specificity result needs a second view.
+**Read the members before using any of them.**
 
 ## Read-time traps
 
