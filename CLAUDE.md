@@ -91,15 +91,45 @@ Two further traps:
 
 ## Gene sets — consume the snapshot, do not rebuild
 
-- Human sets live in `data/genesets_from_library_human/`, a snapshot of
-  `mammary_geneset_library` at tag `v1.0`, dereferenced commit
-  `cbd8f16d2b0f95c5d4e86bed6aa112e42538a34b`.
-- Consume as-is. Do not rebuild them here, do not edit them in place. If the library
-  changes, re-snapshot from a new tag rather than patching files.
-- The tag is the point of truth. See `data/genesets_from_library_human/README.md`.
+Three provenanced inputs, each with its own README. Consume as-is: do not rebuild them
+here, do not edit them in place. If a source changes, re-snapshot rather than patch.
+
+| Input | Location | Source |
+|---|---|---|
+| Human MitoCarta 3.0 | `data/mitocarta_human/` | Broad, `Human.MitoCarta3.0.xls`, 1,136 genes / 154 pathways |
+| CollecTRI regulons | `data/collectri_human/` | OmniPath web service, dated snapshot, 1,201 TFs |
+| Felsher MYC signature | `data/genesets_from_library_human/` | `mammary_geneset_library` tag `v1.0` (`cbd8f16d…`), 67 genes |
+
+### The library's human GMT tree is mouse-derived — do not use it
+
+`mammary_geneset_library` ships `outputs/gmt/human/`. **It must not be loaded here.** The
+library is mouse-native; that tree is built by running `mouse_to_human()` over the mouse
+sets (`R/14_export_gmts.R`). The files carry human symbols and mouse provenance, which is
+exactly the failure mode this repo split exists to prevent — and it looks correct.
+
+Two concrete instances, both already avoided:
+
+- `01_mitocarta_human.gmt` is Mouse MitoCarta ortholog-projected: 1,083 genes against the
+  real 1,136. Use `data/mitocarta_human/` instead.
+- its Felsher set is a human→mouse→human round trip: 62 genes against the native 67,
+  dropping NPM1 and RPLP0 and adding the paralog artefact EIF5AL1.
+
+`outputs/` is also gitignored in the library, so nothing there is reachable by
+`git show` and nothing there is pinned by the tag. Tracked library files are, and that is
+the only supported route:
+`git -C /Users/gs/G/data/MK_myc_2022/mammary_geneset_library show v1.0:<path>`
+
+**Open:** script 07's specificity panel (FAO, one-carbon, mitoribosome, TCA, ROS defence)
+would naturally have come from that tree. Its source is undecided. Decide it explicitly;
+do not default to the library.
+
+### Standing convention
+
 - mtDNA-encoded protein-coding genes (13, `MT-` prefix) sit in a separate synthetic
   "mtDNA-encoded OXPHOS subunits" pathway and are never pooled with nuclear-encoded
   OXPHOS subunits — expression-scale skew.
+- MitoCarta's `OXPHOS` umbrella includes assembly factors. The plan's primary OXPHOS
+  measure is `OXPHOS subunits`. These are different sets; pick deliberately.
 
 ## R coding rules
 
@@ -123,7 +153,9 @@ docs/       the plan, R_CODING_INSTRUCTIONS.md, dated decision notes
 data/
   raw/                          large downloads (gitignored, NOT on origin)
   from_myc_mouse/               frozen mouse result tables + provenance README
-  genesets_from_library_human/  library v1.0 snapshot + provenance README
+  mitocarta_human/              Human MitoCarta 3.0 xls + provenance README
+  collectri_human/              CollecTRI snapshot (tsv.gz) + provenance README
+  genesets_from_library_human/  library v1.0 human assets + provenance README
 functions/  shared utilities
 external/   vendored reference code (mitotyping / Monzel et al.) — reference, not to edit
 results/    intermediate .rds (gitignored, generated at runtime)
