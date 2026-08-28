@@ -7,9 +7,9 @@ relates-to:
   - myc_mouse_finalisation_plan.md (AP7 MB-fork validation; this doc is the human-side counterpart)
   - docs/library_reference/2026-08-22_consensus_myc_double_hit_thread.md
   - Menegollo et al. 2024, Cancer Research (companion paper)
-next-action: confirm D7, then script 01 (discharges G1's correlation criterion)
-resolved: D1, D2 (G1 note), D3, D4, D5 (dated notes in docs/)
-open: D6, D7, and G1's correlation criterion
+next-action: script 01 (discharges G1's correlation criterion)
+resolved: D1, D2, D3, D4, D5, D7 (dated notes in docs/)
+open: D6, G1's correlation criterion, script 07's specificity panel source
 changes-in-v2:
   - added H4 (conditional chemosensitivity) and Block F (clinical outcome)
   - added Block G (DepMap dependency), an orthogonal functional test
@@ -561,7 +561,7 @@ and FAO high; immune infiltrate carries its own BCL2-family profile.
 | Tumour purity | ABSOLUTE (Aran 2015 / PanCanAtlas), via `TCGAbiolinks` | Non-negotiable for any mito or apoptosis score in breast. |
 | Leukocyte / stromal fraction | Thorsson 2018 immune landscape (PanCanAtlas) | Already computed for all TCGA. Cheaper than CIBERSORTx. |
 | PAM50 / ER status | `TCGAbiolinks::PanCancerAtlas_subtypes()` | **BCL2 is estrogen-responsive.** See section 9. |
-| Proliferation index | Hallmark E2F_TARGETS + G2M_CHECKPOINT GSVA | Nuclear mito genes track proliferation; so does any MYC score. |
+| Proliferation index | Hallmark E2F_TARGETS + G2M_CHECKPOINT GSVA. **Two versions, see D7 note.** `PROLIF_STD` = the union, 327 genes. `PROLIF_DISJOINT` = 318 genes, the 9 shared with the stripped Felsher estimator removed. | Nuclear mito genes track proliferation; so does any MYC score. **The covariate shares 14.8% of M-a's genes**, so adjusting for it partially adjusts away the exposure - overlapping measurement, not confounding. |
 | TP53, PIK3CA, PTEN status | MC3 MAF (PanCanAtlas) | H2 and H3 strata. |
 | GISTIC calls (MYC, MCL1, BCL2L1) | PanCanAtlas GISTIC2 `all_thresholded.by_genes` | G2, BUFFER, H4. |
 | Stage, grade, nodal status, size | TCGA clinical / METABRIC | Block F covariates. |
@@ -601,12 +601,32 @@ Mitigations, all three applied:
 
 ```
 PRIME ~ MYC * OXPHOS
-        + purity + leukocyte_fraction + proliferation
+        + purity + leukocyte_fraction + <proliferation, see below>
         + PAM50 + TP53_status + plate
 ```
 
 Test: the `MYC:OXPHOS` coefficient, two-sided. Report effect size and CI; with n ~1000
 almost anything reaches significance.
+
+> **D7 RESOLVED 2026-08-28 - the proliferation term is estimator-specific.** The
+> covariate shares **14.8%** of M-a's genes, so adjusting for it partially adjusts away
+> the exposure and biases `MYC:OXPHOS` toward the null. The fix is asymmetric: removing
+> the shared genes costs **2.8%** of the covariate for M-a but **24.5%** for M-b, and
+> for M-b it strips exactly the canonical proliferation machinery (`AURKA`, `CDK1`,
+> `PCNA`, `MYBL2`, ...). So:
+>
+> | Fit | Proliferation term | Applies to |
+> |---|---|---|
+> | **S1 primary** | `PROLIF_DISJOINT` (318 genes) | **M-a** |
+> | **S1 primary** | `PROLIF_STD` (327 genes) | **M-b** |
+> | **S2 sensitivity** | none - term dropped | both |
+> | **S3 sensitivity** | `PROLIF_STD` (327 genes) | both |
+>
+> **Report all three side by side; this is part of the result, not an appendix.**
+> Survives all three = robust to construction. Appears only in S2 = report that
+> plainly, never select it. `PROLIF_DISJOINT` is defined against the *stripped*
+> Felsher set and must never be reused for M-b. See
+> `docs/2026-08-28_D7_proliferation_covariate.md`.
 
 Then in order:
 
@@ -751,9 +771,11 @@ New repo `myc_human_validation` (pending D1). Same conventions as `myc_mouse`.
 04_snapshot_human_genesets.R      # library v1.0 human GMTs + overlap audit   <- G1
 05_gate_cnv_cooccurrence.R        # pure GISTIC                               <- G2
 06_score_myc_activity.R           # M-a, M-b, M-c
-07_score_mitochondrial.R          # OXPHOS level, mitoPPS, specificity panel
+07_score_mitochondrial.R          # OXPHOS level, mitoPPS, specificity panel,
+                                  #   PROLIF_STD + PROLIF_DISJOINT (D7)
 08_score_priming.R                # PRIME, robust index, negatives, FOXO3 regulon
-09_interaction_models.R           # Block C + specificity battery + strata   -> Panel a
+09_interaction_models.R           # Block C S1/S2/S3 (D7) + specificity
+                                  #   battery + strata                      -> Panel a
 10_buffering_models.R             # Block B                                  -> Panel b
 11_build_state_variable.R         # section 7.5, frozen before Block F
 12_fetch_neoadjuvant_cohorts.R    # GSE194040 primary, GSE164458, GSE25066
@@ -849,6 +871,13 @@ Do not build 09 before G1 and G2 return. Do not build 13 before F3 returns.
   treatment interaction. Two consequent decisions: the H4 primary test becomes
   **continuous** (section 7.5 amended), and H4 uses **all three cohorts meta-analysed**.
   See `docs/2026-08-28_D5_cohort_selection.md`.
+- **D7 - RESOLVED 2026-08-28.** Raised by G1: the proliferation covariate shares 14.8%
+  of M-a's genes, so adjusting for it partially adjusts away the exposure. Overlapping
+  measurement, not confounding. Handling is **estimator-specific** because the fix is
+  asymmetric - a disjoint covariate costs 2.8% of the covariate for M-a but 24.5% for
+  M-b. M-a's primary model takes `PROLIF_DISJOINT`; M-b keeps `PROLIF_STD`; all three
+  specifications reported for both. See
+  `docs/2026-08-28_D7_proliferation_covariate.md`.
 - **D6 - NEW. Does the mouse arm have a metastasis phenotype to anchor F4 to?** The
   manuscript's framing mentions metastatic capacity. If there is a mouse readout, F4
   gains a cross-species anchor and might justify supplementary space. If not, drop F4.
