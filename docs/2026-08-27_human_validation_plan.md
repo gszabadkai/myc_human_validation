@@ -687,6 +687,31 @@ almost anything reaches significance.
 > Felsher set and must never be reused for M-b. See
 > `docs/2026-08-28_D7_proliferation_covariate.md`.
 
+> **D8 RESOLVED 2026-08-28 - missing data is COMPLETE CASES, n = 938.** No
+> imputation. The missingness stacks (84 of the 157 dropped are missing two
+> covariates, 21 are missing three), so no single covariate can be sacrificed to
+> buy sample size - dropping purity recovers 28 patients, dropping TP53 recovers
+> none. Decisive reason: PAM50 is called from expression and the exposures are
+> scored from the same matrix, so imputing it would fill in the covariate that
+> adjusts the exposure from the exposure's own data. RNA is complete for all
+> 1,095, so neither exposure nor endpoint is ever missing; the entire loss is in
+> covariates. Two sensitivity refits are reported alongside: **M2** drops purity,
+> PAM50 and TP53 (n = 1,079) and **M3** keeps plate only (n = 1,095). The n is
+> reported with every estimate, and the 157 dropped are compared against the 938
+> kept on M-a and PRIME as a **generalisability** statement, not a bias check.
+
+> **D9 RESOLVED 2026-08-28 - `plate` is a fixed factor with levels of n < 10
+> pooled into `other`**, 41 levels to 28. TSS is not an alternative: it gives 36
+> levels against plate's 41 and 36 of the 41 plates span more than one TSS, so
+> the two are crossed rather than nested. A random intercept is the better model
+> and is a **sensitivity on the primary arm only** - the battery fits 17 arms x
+> 2,000 draws = 34,000 null models per instrument, which is minutes with `lm` and
+> hours with `lmer`, and the null is not optional. The pooling map is computed
+> once on the primary analysis set and reused unchanged for every arm and every
+> draw, because a percentile is only calibrated if the null models are the model.
+> Within a stratified refit the same rule is re-applied to the stratum after
+> `droplevels()`. See `docs/2026-08-28_D8_D9_missing_data_and_plate.md`.
+
 Then in order:
 
 1. **Specificity battery** - refit with each pathway negative in place of OXPHOS, and
@@ -938,6 +963,15 @@ Do not build 09 before G1 and G2 return. Do not build 13 before F3 returns.
   M-b. M-a's primary model takes `PROLIF_DISJOINT`; M-b keeps `PROLIF_STD`; all three
   specifications reported for both. See
   `docs/2026-08-28_D7_proliferation_covariate.md`.
+- **D8 - RESOLVED 2026-08-28.** Missing data: **complete cases, n = 938, no
+  imputation**, with M2 (n = 1,079) and M3 (n = 1,095) as named sensitivity refits
+  and a generalisability comparison of the 157 dropped. Raised by script 03's
+  coverage report. See `docs/2026-08-28_D8_D9_missing_data_and_plate.md`.
+- **D9 - RESOLVED 2026-08-28.** Plate: **fixed factor, levels of n < 10 pooled
+  into `other`** (41 -> 28), one fixed pooling map across the observed model and
+  all 34,000 null fits; random intercept as a sensitivity on the primary arm
+  only. TSS is crossed with plate, not nested, so it is not an alternative. Same
+  note.
 - **D6 - NEW. Does the mouse arm have a metastasis phenotype to anchor F4 to?** The
   manuscript's framing mentions metastatic capacity. If there is a mouse readout, F4
   gains a cross-species anchor and might justify supplementary space. If not, drop F4.
