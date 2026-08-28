@@ -16,7 +16,7 @@ API are fine as long as R's 60-second default download timeout is raised.
 
 | File | Size | SHA-256 | GDC UUID |
 |---|---|---|---|
-| `mc3.v0.2.8.PUBLIC.maf.gz` | 753 MB | *see below* | `1c8cfe5f-e52d-41ba-94da-f15ea1337efc` |
+| `mc3.v0.2.8.PUBLIC.maf.gz` | 753 MB | `cb0caa0e3a80a24cc4ccaaacc95c690a4032cc87c8ac78519a5b33f3aa3f6b81` | `1c8cfe5f-e52d-41ba-94da-f15ea1337efc` |
 | `TCGA_mastercalls.abs_tables_JSedit.fixed.txt` | 0.9 MB | `f430a975433d82e0098d7405619d4f12a0c765fcd97e7d63cc9b1de7f2d763cd` | `4f277128-f793-4354-a13d-30cc7fe9f6b5` |
 | `TCGA_all_leuk_estimate.masked.20170107.tsv` | 0.6 MB | `5a8268caedbf8dc98a75be0528d583238d7355761d9fc746e42002f223a982d9` | `6f75c9d7-5134-4ed1-b8f3-72856c98a4e8` |
 | `TCGA-RPPA-pancan-clean.txt` | 18.9 MB | `06246573836865589134bd9424189f81b0d9fb436fcbf5e72024225442c400de` | `fcbb373e-28d4-4818-92f3-601ede3da5e1` |
