@@ -1,13 +1,13 @@
 ---
 date: 2026-08-28
-status: PROPOSAL - needs sign-off before script 07 is written
+status: RESOLVED 2026-08-28 - all 8 items agreed, applied to plan and CLAUDE.md
 relates-to:
   - 2026-08-27_human_validation_plan.md (sections 1, 2, 7.2)
   - 2026-08-28_D4_scoping_and_G2_design.md (the FAO caveat)
   - CLAUDE.md (gene-set rules, OXPHOS umbrella vs subunits)
 decides:
   - script 07 specificity panel source and membership
-  - OPEN: which OXPHOS instrument carries the primary interaction
+  - RESOLVED: BOTH instruments co-primary; claim only what both support
 supersedes: the "build it from MitoCarta pathways, or take the library GMT"
   framing. Both were wrong about what the mouse actually did.
 ---
@@ -140,7 +140,7 @@ by set size and expression level. **Proposal: adopt the same 2000
 expression-matched null for every arm in the human battery.** It is cheap and it
 is the difference between a ranking and a test.
 
-## 6. OPEN DECISION - which instrument carries the primary interaction
+## 6. RESOLVED - BOTH instruments are co-primary
 
 This is the one I cannot settle, and it is not cosmetic. `figS2_oxphos_subunit_
 heatmap.R` shows the same 87 mouse subunits on the same contrast giving:
@@ -171,7 +171,20 @@ level. The plan's primary human OXPHOS measure is a GSVA level. So as written,
 the human arm would test a different quantity from the one the mouse result
 describes, and a null could mean nothing more than an instrument mismatch.
 
-Options, in the order I would rank them:
+**DECISION 2026-08-28: option 3. Both co-primary, reported side by side.**
+
+> **Rule for disagreement, fixed before any model is fitted:** report both;
+> claim only what **both** instruments support. An effect appearing on one
+> instrument alone is reported as instrument-dependent and is NOT a positive
+> result.
+
+Consequence for Block F: GSVA is the instrument that travels, because mitoPPS is
+composition-dependent and cannot be compared across cohorts. So the
+meta-analysis runs on GSVA and mitoPPS is TCGA-internal. That asymmetry is a
+property of the instruments, not a choice, and it must be stated rather than
+quietly worked around.
+
+Options as considered, in the order I ranked them:
 
 1. **mitoPPS primary, GSVA secondary** - matches the mouse instrument, so the
    cross-species claim is like-for-like. Costs: mitoPPS is composition-dependent
@@ -182,10 +195,9 @@ Options, in the order I would rank them:
 3. **Both as co-primary, reported side by side** - honest, costs a doubled
    battery, and needs a rule for what to conclude when they disagree.
 
-I lean to **3**, then **1**. The whole arm exists to test a specific mouse claim;
-running an instrument the mouse did not use, and calling a null a failure to
-replicate, would not be defensible. But this is a pre-registration decision and
-it is yours.
+Taken: **3**. The whole arm exists to test a specific mouse claim; running an
+instrument the mouse did not use, and calling a null a failure to replicate,
+would not be defensible.
 
 ## 7. Where `GS_metabolic` fits
 
@@ -226,15 +238,17 @@ Current text rejects the library's human GMT tree. Add, immediately after it:
 > mouse. Taking the human sheet is not a round trip. Check the sheet, not the
 > repository.
 
-## 9. Summary of what needs sign-off
+## 9. All eight agreed 2026-08-28
 
-1. **MitoCarta human as the battery source**, same pathway names as the mouse.
-2. **`OXPHOS assembly factors` promoted to primary negative** - the mouse's
-   tightest control, currently absent from the plan.
-3. **Comparators framed as named alternatives**, per section 3.
-4. **`Carnitine shuttle` merged into `Fatty acid oxidation`** (5 genes is
-   unscoreable), and the FAO/Lee caveat pre-stated.
-5. **2000 expression-matched random sets** as the null for every arm.
-6. **The instrument decision** - section 6. The one that actually matters.
-7. **`GS_metabolic` human sheet snapshotted for complex-level analysis only.**
-8. **CLAUDE.md amendment** - section 8.
+| # | Item | Applied to |
+|---|---|---|
+| 1 | MitoCarta human as the battery source | CLAUDE.md, plan section 2 |
+| 2 | `OXPHOS assembly factors` -> PRIMARY negative | plan section 2, CLAUDE.md |
+| 3 | Comparators framed as named alternatives | plan section 2 |
+| 4 | `Carnitine shuttle` merged into FAO; FAO/Lee caveat pre-stated | plan section 2 |
+| 5 | 2,000 expression-matched random sets as the null | plan section 2 |
+| 6 | **Both instruments co-primary**; claim only what both support | plan section 7.2, CLAUDE.md |
+| 7 | `GS_metabolic` human sheet snapshotted, complex-level only | `data/genesets_metabolic_human/` |
+| 8 | CLAUDE.md amendment - the rejection is of `outputs/gmt/human/`, not the library | CLAUDE.md |
+
+Nothing here is open. Script 07 can be written.

@@ -164,9 +164,43 @@ post-hoc hypothesis.
 
 A positive OXPHOS result is only reportable alongside the accompanying negatives:
 
-- **Pathway negatives:** the identical interaction fitted with FAO / carnitine shuttle,
-  one-carbon and glycine cleavage, mitoribosome, TCA, ROS defence, and mtDNA-encoded
-  OXPHOS held separately. Expected: OXPHOS-subunit-specific.
+- **Pathway negatives:** the identical interaction fitted with each comparator arm
+  held separately. **Amended 2026-08-28** - the arms are now those the mouse
+  actually ran (`myc_mouse/scripts/43`), taken from Human MitoCarta 3.0 by
+  pathway name, and each answers a NAMED alternative rather than being an
+  arbitrary other pathway:
+
+  | Alternative to H1 | Arm | n |
+  |---|---|---|
+  | biogenesis, not respiration | **`OXPHOS assembly factors`** - PRIMARY negative | 68 |
+  | growth / translation | `Mitochondrial ribosome` | 83 |
+  | proliferation | `Nucleotide metabolism` + the D7 proliferation score | 40 |
+  | redox, not respiration | `ROS and glutathione metabolism` | 27 |
+  | generic mito metabolism | `TCA cycle`, `Amino acid`, `Lipid metabolism` | 20 / 90 / 123 |
+  | FAO (Lee et al. 2017) | `Fatty acid oxidation` + `Carnitine shuttle` merged | 49 |
+  | one-carbon | `Folate and 1-C metabolism`, `Glycine metabolism` | 21 / 15 |
+  | scale artefact | 2,000 expression-matched random sets | - |
+
+  `OXPHOS assembly factors` is the **primary** negative: same complexes, same
+  umbrella, different function, and it is the mouse's sharpest result (subunits
+  at percentile 0.0 of expression-matched sets, their own assembly factors at
+  50.2). A distant pathway cannot exclude what that pair excludes.
+
+  `Carnitine shuttle` alone is 5 genes and is unscoreable; it is merged into
+  `Fatty acid oxidation`.
+
+  **The FAO arm carries a pre-stated caveat.** Lee et al. 2017 report that TNBC
+  cancer stem cells are preferentially FAO-dependent. If the FAO arm fires, the
+  honest reading is "consistent with Lee et al.", not "the OXPHOS coupling is
+  non-specific". Stated now, before the result. The same applies more weakly to
+  one-carbon via `MTHFD2` (G1 note section 7).
+
+  Expected: OXPHOS-subunit-specific. mtDNA-encoded OXPHOS is held separately per
+  the standing convention.
+
+  **Every arm is tested against 2,000 expression-matched random gene sets**, not
+  only against the other arms. Without that null, "OXPHOS moved and TCA did not"
+  is confounded by set size and expression level.
 - **Endpoint negatives:** BID/BCL2L1, BAX/BCL2L1, BCL2L11/BCL2L1, BAK1/BCL2L1.
   The mouse says only PUMA/BCL-XL reverses. Human should show the same.
 
@@ -482,17 +516,42 @@ and M-b disagree, report both and treat the claim as unsupported.
 
 ### 7.2 Mitochondrial axes
 
-- **Level (primary):** mean z-score of nuclear-encoded MitoCarta 3.0 OXPHOS subunits.
-  Per standing convention the 13 mtDNA-encoded protein-coding genes sit in a separate
-  synthetic "mtDNA-encoded OXPHOS subunits" pathway and are never pooled with the
-  nuclear set (expression-scale skew).
-- **Shape (secondary):** mitoPPS. It normalises each pairwise pathway ratio by the
-  global average across samples, so it reports the *shape* of the mitochondrial program
-  and is deliberately robust to total content. Part of the mouse claim is about OXPHOS
-  *level*. Report both. **Never compare mitoPPS values numerically across cohorts or
-  species** - the baseline is composition-dependent.
-- **Specificity panel:** FAO / carnitine shuttle, one-carbon and glycine cleavage,
-  mitoribosome, TCA, ROS defence. Size-matched where possible.
+> **AMENDED 2026-08-28. Both instruments are PRIMARY, not level-primary /
+> shape-secondary.** The mouse interaction (p = 0.0052) was fitted on **mitoPPS**,
+> not on a level; the plan's original primary was a GSVA level. Those are
+> different quantities, and `myc_mouse/figures/panels/figS2_oxphos_subunit_
+> heatmap.R` shows the same 87 subunits on the same contrast giving +0.061
+> unweighted, +0.201 expression-weighted and +0.226 summed - *"Both are correct.
+> They weight differently."* Running only a level and calling a null a failure to
+> replicate would not be defensible.
+>
+> **Rule for disagreement, fixed before any model is fitted:** report both; claim
+> only what **both** instruments support. An effect on one instrument alone is
+> reported as instrument-dependent and is not a positive result.
+>
+> Made pre-outcome, on a reading of the mouse source rather than of any human
+> result. Both were already scored by the plan; only which is primary changes.
+
+- **Level (co-primary):** mean z-score of nuclear-encoded MitoCarta 3.0 OXPHOS
+  subunits, via GSVA on VST. **Portable across cohorts**, so this is the
+  instrument Block F meta-analysis uses.
+- **Composition (co-primary):** mitoPPS on the linear matrix. It normalises each
+  pairwise pathway ratio by the global average across samples, so it reports the
+  *shape* of the mitochondrial program and is deliberately robust to total
+  content. **This is the instrument the mouse result is on.** Never compare
+  mitoPPS values numerically across cohorts or species - the baseline is
+  composition-dependent, so only the pattern transfers, which is why it cannot
+  carry Block F.
+- Per standing convention the 13 mtDNA-encoded protein-coding genes sit in a
+  separate synthetic "mtDNA-encoded OXPHOS subunits" pathway and are never pooled
+  with the nuclear set (expression-scale skew).
+- **Complex-level resolution:** the mouse claim is that OXPHOS falls *across all
+  complexes*. MitoCarta's `OXPHOS subunits` is one flat list of 102, so the
+  per-complex sets come from `data/genesets_metabolic_human/` (Complex I 49,
+  II 4, III 11, IV 27, ATPase 5).
+- **Specificity panel:** see the amended section 2. Arms are Human MitoCarta
+  pathways matching the mouse comparators, with `OXPHOS assembly factors` as the
+  primary negative and a 2,000-set expression-matched null.
 
 ### 7.3 Priming endpoints
 
@@ -771,7 +830,8 @@ New repo `myc_human_validation` (pending D1). Same conventions as `myc_mouse`.
 04_snapshot_human_genesets.R      # library v1.0 human GMTs + overlap audit   <- G1
 05_gate_cnv_cooccurrence.R        # pure GISTIC                               <- G2
 06_score_myc_activity.R           # M-a, M-b, M-c
-07_score_mitochondrial.R          # OXPHOS level, mitoPPS, specificity panel,
+07_score_mitochondrial.R          # OXPHOS on BOTH instruments (GSVA + mitoPPS),
+                                  #   specificity arms + expression-matched null,
                                   #   PROLIF_STD + PROLIF_DISJOINT (D7)
 08_score_priming.R                # PRIME, robust index, negatives, FOXO3 regulon
 09_interaction_models.R           # Block C S1/S2/S3 (D7) + specificity

@@ -119,9 +119,22 @@ Two concrete instances, both already avoided:
 the only supported route:
 `git -C /Users/gs/G/data/MK_myc_2022/mammary_geneset_library show v1.0:<path>`
 
-**Open:** script 07's specificity panel (FAO, one-carbon, mitoribosome, TCA, ROS defence)
-would naturally have come from that tree. Its source is undecided. Decide it explicitly;
-do not default to the library.
+**The rejection is of `outputs/gmt/human/`, not of the library.** Amended
+2026-08-28. That tree is mouse-native sets pushed through `mouse_to_human()`,
+gitignored, and unpinned by the tag - all three reasons apply to it and to
+nothing else. Tracked *raw inputs* carrying their own native human data are a
+different object:
+`data/raw/user_curated/GS_metabolic_genes_list.xlsx` has a `human` sheet (2,347
+genes, 74 classifications) which the library reads and maps *to* mouse. Taking
+the human sheet is not a round trip. **Check the sheet, not the repository** -
+and snapshot what you take, with the blob SHA. See
+`data/genesets_metabolic_human/`.
+
+**RESOLVED 2026-08-28.** Script 07's specificity panel comes from **Human
+MitoCarta 3.0**, using the same MitoPathway names as the mouse arms in
+`myc_mouse/scripts/43_substrate_specificity_and_tradeoff.R`. The cross-species
+link is the pathway *name*; each species uses its own native MitoCarta, so no
+projection is involved. See `docs/2026-08-28_specificity_panel_proposal.md`.
 
 ### Standing convention
 
@@ -129,7 +142,15 @@ do not default to the library.
   "mtDNA-encoded OXPHOS subunits" pathway and are never pooled with nuclear-encoded
   OXPHOS subunits — expression-scale skew.
 - MitoCarta's `OXPHOS` umbrella includes assembly factors. The plan's primary OXPHOS
-  measure is `OXPHOS subunits`. These are different sets; pick deliberately.
+  measure is `OXPHOS subunits`. These are different sets; pick deliberately. The
+  **assembly factors are the primary specificity control**, not a leftover: in the
+  mouse they sit at percentile 50.2 of expression-matched sets while the subunits
+  sit at 0.0, and being the same complexes they exclude what a distant pathway
+  cannot (D-2026-08-28, specificity panel proposal section 2).
+- **OXPHOS is measured on two instruments, both primary.** GSVA level (portable
+  across cohorts) and mitoPPS (composition; the instrument the mouse interaction
+  was fitted on). They answer different questions and the same genes can move in
+  opposite directions on them. Report both; claim only what both support.
 
 ## R coding rules
 
