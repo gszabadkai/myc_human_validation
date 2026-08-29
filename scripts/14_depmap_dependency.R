@@ -672,6 +672,76 @@ for (ins in INSTRUMENTS) {
 }
 
 # =============================================================================
+# 5d. The declared BCL2L11 check
+# =============================================================================
+# Built to docs/2026-08-30_block_g_result_and_bcl2l11_declaration.md section 4,
+# in which the three models, the direction and the reading of every outcome were
+# fixed BEFORE any of this was fitted. Read that first; this implements it and
+# re-decides none of it.
+#
+# WHY: not to establish universality. To find out whether the breast BCL2L11
+# coefficient EXISTS AT ALL. At n = 51 a real effect and a pair of leverage
+# points are not distinguishable; at n ~ 1,130 they are. It is the same test
+# that has just disposed of G-a and G-b, applied to the one coefficient that
+# survived it.
+#
+# DIRECTION, fixed in the declaration: POSITIVE MYC:OX, on both instruments.
+# A negative is not a pass and is not reported as one.
+#
+# BCL2L11 is a CONTROL gene here, not a declared endpoint, and there is still no
+# expression-matched null in CCLE. A positive below is not reportable until that
+# null is built. See declaration section 4.5.
+message("\n5d. the declared BCL2L11 pan-cancer check")
+
+CHECK_GENE <- "BCL2L11"
+stopifnot(CHECK_GENE %in% colnames(CRISPR))
+
+is_breast <- pan_lines %in% breast
+message("   pan-cancer ", length(pan_lines), " lines, of which ",
+        sum(is_breast), " ", LINEAGE, " and ", sum(!is_breast), " other")
+
+.check_frame <- function(rows_keep, ins, arm) {
+  d <- tibble::tibble(
+    MYC     = MYC_PAN[pan_lines],
+    OX      = SC_PAN[[ins]][arm, pan_lines],
+    PROLIF  = PROLIF_PAN[pan_lines],
+    lineage = factor(lin_pan),
+    brst    = as.numeric(is_breast),   # NOT `breast`: that is the global
+                                       # ModelID vector, and lm() resolving the
+                                       # right one by scoping luck is a trap
+    Y       = CRISPR[pan_lines, CHECK_GENE])[rows_keep & keep_lin, ]
+  droplevels(d)
+}
+
+for (ins in INSTRUMENTS) {
+  for (arm in c(ARM_PRIMARY, ARM_NEGATIVE)) {
+
+    # P1 - pooled pan-cancer, lineage-adjusted. Is the effect real?
+    d1 <- .check_frame(rep(TRUE, length(pan_lines)), ins, arm)
+    m1 <- stats::lm(Y ~ MYC * OX + PROLIF + lineage, data = d1)
+    .add(.tidy(m1, "MYC:OX", "P1 BCL2L11 pan-cancer pooled", ins,
+               extra = list(gene = CHECK_GENE, arm = arm, scope = "pan-cancer")))
+
+    # P2 - pan-cancer EXCLUDING breast. Is it universal? Genuinely out of
+    # sample: this fit never sees the 51 lines that produced the observation.
+    d2 <- .check_frame(!is_breast, ins, arm)
+    m2 <- stats::lm(Y ~ MYC * OX + PROLIF + lineage, data = d2)
+    .add(.tidy(m2, "MYC:OX", "P2 BCL2L11 pan-cancer excl breast", ins,
+               extra = list(gene = CHECK_GENE, arm = arm,
+                            scope = "pan-cancer minus breast")))
+  }
+
+  # P3 - breast vs rest. Is it ENRICHED in breast? UNDERPOWERED by construction
+  # (51 against ~1,079), so a null here is uninformative, not evidence against.
+  # Primary arm only; a three-way on the negative arm would be noise on noise.
+  d3 <- .check_frame(rep(TRUE, length(pan_lines)), ins, ARM_PRIMARY)
+  m3 <- stats::lm(Y ~ MYC * OX * brst + PROLIF + lineage, data = d3)
+  .add(.tidy(m3, "MYC:OX:brst", "P3 BCL2L11 breast vs rest", ins,
+             extra = list(gene = CHECK_GENE, arm = ARM_PRIMARY,
+                          scope = "pan-cancer, breast interaction")))
+}
+
+# =============================================================================
 # 6. Block G item 3 - drug sensitivity
 # =============================================================================
 # PRISM Repurposing log2 fold change: MORE NEGATIVE = MORE SENSITIVE, the same
@@ -764,14 +834,58 @@ p2 <- .both(g_bclx$estimate < 0 & g_bclx$p < 0.05)
 p3 <- !any(g_neg$estimate < 0 & g_neg$p < 0.05)
 p4 <- !.both(g_bcl2$estimate < 0 & g_bcl2$p < 0.05)
 
+# --- the declared BCL2L11 check, read by the rules fixed before the fit ------
+.pos <- function(lab) {
+  r <- coefs[coefs$label == lab & coefs$arm == ARM_PRIMARY, ]
+  length(unique(r$instrument)) == 2L && all(r$estimate > 0) && all(r$p < 0.05)
+}
+q1 <- .pos("P1 BCL2L11 pan-cancer pooled")
+q2 <- .pos("P2 BCL2L11 pan-cancer excl breast")
+q3 <- .pos("P3 BCL2L11 breast vs rest")
+
+# Declaration section 4.4, transcribed. The reading is looked up, not composed
+# after the fact.
+verdict <- if (!q1) {
+  paste("P1 null - the breast BCL2L11 coefficient was noise at n = 51.",
+        "Report as a negative and drop it.")
+} else if (q2) {
+  paste("P1 and P2 both positive - REAL and NOT breast-specific. A property of",
+        "the MYC/OXPHOS state, not of mammary context. One sentence plus",
+        "Extended Data; NOT a main panel (declaration 4.4).")
+} else if (q3) {
+  paste("P1 positive, P2 null, P3 positive - ENRICHED IN BREAST. The outcome",
+        "that speaks to the mammary axis. Extended Data with the BIM story.")
+} else {
+  paste("P1 positive, P2 null, P3 null - consistent with breast enrichment but",
+        "P2 null is weak evidence for it alone, and P3 is underpowered.",
+        "Extended Data, stated with that caveat.")
+}
+
 declared <- tibble::tibble(
   test = c("G-a  MCL1 dependency: MYC:OX negative, both instruments",
            "G-b  BCL2L1 dependency: MYC:OX negative, both instruments",
            "G-c  and NOT the assembly factors (specificity)",
-           "G-d  and NOT BCL2 (the endpoint specificity control)"),
-  predicted = c("negative", "negative", "null / weaker", "null / weaker"),
-  passes = c(p1, p2, p3, p4))
+           "G-d  and NOT BCL2 (the endpoint specificity control)",
+           "P1   BCL2L11 pan-cancer pooled: MYC:OX positive, both instruments",
+           "P2   BCL2L11 excluding breast (out of sample)",
+           "P3   BCL2L11 enriched in breast (UNDERPOWERED)"),
+  predicted = c("negative", "negative", "null / weaker", "null / weaker",
+                "positive", "positive", "positive"),
+  passes = c(p1, p2, p3, p4, q1, q2, q3))
 declared %>% as.data.frame() %>% print(row.names = FALSE)
+
+message("\n   BCL2L11 check, the declared reading:")
+message("   ", verdict)
+message("\n   BCL2L11 coefficients:")
+coefs %>% dplyr::filter(gene == "BCL2L11") %>%
+  dplyr::select(label, arm, instrument, n, estimate, ci_lo, ci_hi, p) %>%
+  dplyr::mutate(dplyr::across(dplyr::where(is.numeric), ~ signif(.x, 3))) %>%
+  as.data.frame() %>% print(row.names = FALSE)
+message("   REMINDER: BCL2L11 is a control gene, not a declared endpoint, and ",
+        "there is\n   still no CCLE matched null. A positive here is NOT ",
+        "reportable until that\n   null is built (declaration section 4.5). It ",
+        "does not rescue H1, and it is\n   NOT the BIM replication committed to ",
+        "in the Block C note section 9.")
 
 message("\n   G2 breast, primary and control genes (", ARM_PRIMARY, "):")
 coefs %>% dplyr::filter(label == "G2 breast", arm == ARM_PRIMARY) %>%
@@ -809,6 +923,9 @@ message("\n8. save")
 out <- list(
   coefficients = coefs,
   declared     = declared,
+  bcl2l11_check = list(verdict = verdict, P1 = q1, P2 = q2, P3 = q3,
+                       declaration =
+                         "docs/2026-08-30_block_g_result_and_bcl2l11_declaration.md"),
   scores       = list(gsva = GS, mitopps = PPS, lines = lines),
   coverage     = coverage,
   lines        = tibble::tibble(
