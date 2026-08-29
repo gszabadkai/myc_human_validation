@@ -204,6 +204,26 @@ A positive OXPHOS result is only reportable alongside the accompanying negatives
 - **Endpoint negatives:** BID/BCL2L1, BAX/BCL2L1, BCL2L11/BCL2L1, BAK1/BCL2L1.
   The mouse says only PUMA/BCL-XL reverses. Human should show the same.
 
+  > **CORRECTED 2026-08-29. `BCL2L11` is NOT a negative control and the sentence
+  > above is wrong.** `myc_mouse/scripts/44` sets
+  > `PRESPEC <- c("Bbc3", "Bcl2l11")` and states that both are *"named in advance
+  > because the PGC1a perturbation induces both at protein level (author's
+  > westerns)"*, independent of the RNA-seq; `scripts/42` tests `Bcl2l11:Bcl2l1`
+  > in the same priming pair panel as `Bbc3:Bcl2l1`; `scripts/23` carries a
+  > switch testing whether the FOXO programme is PUMA-selective or broad. What
+  > the mouse found is that BIM's 6W effect was **non-significant (p 0.46)** and
+  > that PUMA was the only pair with a real 6W effect to reverse sign - so PUMA
+  > was chosen because it was **resolvable at n = 24**, not because BIM was
+  > excluded. The sentence above turned "unresolvable" into "excluded".
+  >
+  > `BID`, `BAX` and `BAK1` remain valid negatives. `BCL2L11` is a
+  > **co-candidate of the research programme**, pre-specified on independent
+  > protein evidence, and the Block C result must be read accordingly - see
+  > `docs/2026-08-29_block_c_result_H1_not_supported.md` section 0.
+  >
+  > H1 itself is unchanged. It names PRIME, PRIME is the pre-registered
+  > endpoint, and it is not supported.
+
 ---
 
 ## 3. Dataset assignment
