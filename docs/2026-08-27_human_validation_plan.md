@@ -851,6 +851,20 @@ association alone is confounded by subtype and is not the claim.
 
 ### Block G - DepMap functional dependency (NEW in v2) -> Panel c inset
 
+> **AMENDED 2026-08-29, when script 14 was written.** Two things the section
+> below does not say, both now recorded in the script and in
+> `data/depmap/README.md`. **(1) The prediction is two-sided in substance.**
+> Block C found `MYC x OXPHOS` associated with *less* BCL2L1 transcript, where
+> this section predicts *more* dependency on BCL2L1 protein. Those are different
+> quantities - a cell can need a protein more precisely because it has less - so
+> both outcomes are live. The pre-registered prediction is unchanged (negative
+> `MYC:OX` on Chronos gene effect); the reverse is reported when it occurs and is
+> not scored as a pass. **(2) There is no expression-matched null in CCLE.**
+> Script 07's nulls are TCGA-specific and do not transfer, so the 18-arm panel in
+> script 14 is a rank ordering, not a calibrated p-value, and a positive OXPHOS
+> result needs a CCLE null built before it is reportable. Breast is ~50 lines, so
+> a lineage-adjusted pan-cancer fit is reported as the powered secondary.
+
 Orthogonal to everything above because it is functional rather than observational, and
 it is immediately available.
 
@@ -927,7 +941,7 @@ New repo `myc_human_validation` (pending D1). Same conventions as `myc_mouse`.
 12_fetch_neoadjuvant_cohorts.R    # GSE194040 primary, GSE164458, GSE25066
 13_outcome_models.R               # Block F1-F4                              -> Panel c
 14_depmap_dependency.R            # Block G                                  -> Panel c inset
-15_forkscale_replication.R        # Block D + D2                             -> ED2
+15_forkscale_replication.R        # Block D + D2 + F3-pre                    -> ED2
 16_rppa_confirmation.R            # Block E                                  -> ED3
 17_metabric_scanb_replication.R   # ED4
 18_figures.R

@@ -108,6 +108,38 @@ snapshotted CDR gives BRCA 151 OS and 145 PFI events at ~2.3 years median follow
 F3-pre is a **diagnostic on the exposure**, not a fifth hypothesis. It is declared here,
 before it is run, and it has no outcome variable in it.
 
+### 4b. F3-pre, read rules fixed before the fit
+
+Added 2026-08-29, in the same commit as `scripts/15_forkscale_replication.R` and before
+that script has been sourced. No F3-pre quantity has been computed at the time of
+writing.
+
+**Decision variable.** `MB1_forkscale = MB1.pc1 / MB1.index`, the plain form. It is
+complete on all 1,037 patients, where `MB1_forkscale_log` is `Inf` at `index == 1`. The
+log form is the companion paper's preferred variant and is reported alongside, but the
+verdict is taken on the plain form so that a single dropped sample cannot move it.
+
+**Statistic.** Spearman rho against `OXPHOS subunits` on **both** instruments, computed
+on the Block C/B analysis set. Spearman because forkscale is severely skewed by
+construction; Pearson is reported as a companion.
+
+| Verdict | Condition |
+|---|---|
+| **REDUNDANT** | abs(rho) >= 0.70 on **both** instruments |
+| **INDEPENDENT** | abs(rho) <= 0.30 on **both** instruments |
+| **INTERMEDIATE** | anything else |
+
+**What each verdict means.** REDUNDANT: this arm's axis is largely MB1 forkscale under
+another name, any outcome claim built on it will be very hard to separate from Menegollo
+Fig 7, and F3 proper must clear a correspondingly high bar - report and consider
+stopping. INDEPENDENT: the two axes are largely different things and F3 proper is a
+genuine test. INTERMEDIATE: report the number and let F3 proper decide; no action is
+taken on it here.
+
+**What this does not do.** It does not pass or fail F3, which is a survival test. It does
+not licence dropping F3 proper if the verdict is INDEPENDENT, and it does not by itself
+end the arm if the verdict is REDUNDANT. It touches no outcome variable.
+
 ## 5. What is still outstanding - METABRIC only
 
 METABRIC forkscale is one file short. The upstream compile script builds it as
