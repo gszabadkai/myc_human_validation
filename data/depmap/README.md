@@ -93,6 +93,37 @@ Script 14 handles both and refuses anything else - this repo has already been
 bitten once by testing `== "True"` against a column that had been parsed as
 logical, where the result was a silent all-FALSE.
 
+## Is the PRISM *secondary* (dose-response) screen needed? No.
+
+Asked and settled 2026-08-30. **Repurposing Public 24Q2 has no secondary screen.**
+It contains two single-dose screens, REP1M and REP300, both at 2.5 uM with a
+5-day treatment (its release notes are at `docs/README_prism.txt`). The
+dose-response screen with AUC and IC50 exists only in the **older** PRISM
+Repurposing releases, 19Q4 (`9393293`) and 20Q2 (`20564034`), as
+`secondary-screen-dose-response-curve-parameters.csv`.
+
+Taking it would be a bad trade, and not on general grounds - on a specific one.
+Checked against the 20Q2 treatment table
+(`prism-repurposing-20q2-primary-screen-replicate-collapsed-treatment-info.csv`),
+of the seven compounds plan section 10 names, **that release contains only
+navitoclax and venetoclax**. None of the three MCL1 inhibitors is in it -
+S63845, AMG-176 and AZD5991 are all absent, and the secondary screen is a subset
+of the primary, so they cannot be in it either.
+
+So the secondary screen would cost **the entire MCL1 arm**, which is the arm the
+plan's prediction actually rests on ("selectively dependent on MCL1 and/or
+BCL2L1"), in exchange for dose-response on two compounds that 24Q2 already
+covers. It would also bring a different, older cell-line panel and 290 MB.
+
+**Limitation to state, not to fix:** the 24Q2 readout is single-dose LFC at
+2.5 uM, which is coarser than an AUC - a null could in principle be a dose
+artefact rather than an absence of effect. There is no release that gives both
+dose-response and MCL1 coverage, so this is a limitation of the available data.
+
+Also **not needed**: `Repurposing_Public_24Q2_Cell_Line_Meta_Data.csv`. The
+Extended Primary Data Matrix already has `depmap_id` (`ACH-...`) as its column
+names, verified directly, so no cell-line join is required.
+
 ## The release gap in item 3
 
 `Model.csv`, the expression matrix and `CRISPRGeneEffect.csv` are **26Q1**.
