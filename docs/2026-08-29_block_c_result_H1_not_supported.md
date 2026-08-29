@@ -25,6 +25,72 @@ replication cohort has been opened, so the ordering is checkable.
 
 ---
 
+## 0. AMENDMENT, later the same day
+
+Two things were found after this note was first written. **The original text
+below is unaltered**; this section says what it got wrong and what it does not
+change.
+
+### (a) The plan mis-read the mouse. `BCL2L11` should never have been a negative control
+
+Plan section 2 justified the endpoint-negative panel with *"The mouse says only
+PUMA/BCL-XL reverses. Human should show the same."* Checked against the mouse
+source, read-only, on 2026-08-29:
+
+```
+myc_mouse/scripts/44_collapse_module_and_ownership.R
+
+    PRESPEC <- c("Bbc3", "Bcl2l11")
+
+    "Bbc3 (PUMA) and Bcl2l11 (BIM) are named in advance because the PGC1a
+     perturbation induces both at protein level (author's westerns). Those
+     experiments are INDEPENDENT of this RNA-seq, so using them to fix which
+     genes and sets are tested is pre-registration, not circularity -- and at
+     n=24 it is the strongest available position."
+```
+
+`myc_mouse/scripts/42` tests `Bcl2l11:Bcl2l1` in the same priming pair panel as
+`Bbc3:Bcl2l1`. `myc_mouse/scripts/23` carries a switch, `foxo_puma_select`,
+testing whether the FOXO programme is "PUMA-SELECTIVE" or "broad" - so the mouse
+was **actively uncertain** about BIM, not settled against it.
+
+What the mouse does say, and it is the sentence the plan compressed:
+
+```
+"Bmf and Bcl2l11 have MORE extreme retentions than PUMA but NON-SIGNIFICANT
+ 6W effects (p6 0.41 and 0.46), and a retention is a ratio of two noisy
+ quantities -- you cannot lose an effect you never had. Among the pairs with a
+ real 6W effect, PUMA is the ONLY one that reverses sign."
+```
+
+**PUMA was chosen because it was resolvable at n = 24, not because BIM was
+excluded.** The plan turned "we could not resolve BIM" into "the mouse excluded
+BIM", and that is what demoted `BCL2L11` to a control.
+
+**Consequence.** `BCL2L11` is not a post-hoc finding. It is a **co-candidate
+pre-specified by the research programme on independent protein evidence, which
+this arm's plan mistakenly relabelled as a negative control.** That is a
+materially stronger position than section 8 below granted it - and a materially
+weaker one than "H1 confirmed".
+
+### (b) The endpoint panel is showing TWO effects, not four
+
+See the block added at the end of section 6. Every ratio is its own numerator
+minus the shared `BCL2L1` denominator, exactly; once decomposed, the panel is
+BCL-XL down and BIM up, not four scattered hits.
+
+### What does NOT change
+
+- **H1 as pre-registered names PRIME, and PRIME is null.** That stands, and the
+  four decision clauses still all fail.
+- **The replication declared in section 9 is unaltered.** Its predictions were
+  fixed before this amendment and must not move because the rationale improved.
+  A prediction that is edited after the fact is not a prediction.
+- The BIM result is still S1-only, still untested across the D7 specifications,
+  and still unreplicated.
+
+---
+
 ## 1. The headline
 
 ```
@@ -173,6 +239,37 @@ already shown PRIME is ~84% its numerator (rho 0.838 with `log2(BBC3)`, -0.128
 with `log2(BCL2L1)`), so "PRIME is flat" and "PUMA is flat" are close to the same
 statement, and both are true.
 
+### 6.1 Decomposed, the panel is two effects (added in the amendment)
+
+Every ratio endpoint is exactly its own numerator coefficient minus the shared
+`BCL2L1` denominator coefficient - an algebraic identity of OLS on the same
+design and the same 938 patients, verified to machine precision, not an
+empirical finding. Reading it that way:
+
+```
+                    ratio     numerator    -denominator    numerator's share
+PRIME (PUMA)       0.0204      -0.0138         0.0342          negative
+BID/BCL-XL         0.0622      +0.0279         0.0342             45%
+BAX/BCL-XL         0.0489      +0.0146         0.0342             30%
+BCL2L11/BCL-XL     0.0851      +0.0509         0.0342             60%
+BAK1/BCL-XL        0.0241      -0.0101         0.0342          negative
+                                                        (GSVA; mitoPPS agrees)
+```
+
+**BCL-XL falling is the shared signal in every one of them, and BIM is the only
+BH3-only protein whose own level rises.** BID, BAX and BAK1 "fired" mostly by
+borrowing the falling denominator. PUMA moves slightly the *wrong* way, and
+PRIME is positive at all only because BCL-XL falls underneath it.
+
+So the concern this note originally recorded - "three of four negatives fired,
+which is a specificity failure" - largely dissolves. The panel is not four
+scattered effects. It is **two**: BCL-XL down, BIM up. That is a coherent and
+specific mechanism, and it is the one the mouse pre-specified from westerns.
+
+It also means the four ratio endpoints carry **no information beyond the six
+limbs**. Any future reporting should lead with the limbs; the ratios are a
+derived view of them.
+
 ## 7. What the BIM result survives, stated with its context
 
 - **Both instruments**, which is the bar this project set in advance.
@@ -190,6 +287,12 @@ statement, and both are true.
 
 ## 8. What this is not
 
+> **CORRECTED by section 0(a).** The premise of this section - that `BCL2L11`
+> was a negative control - was this arm's error, not the mouse's. `BCL2L11` was
+> pre-specified alongside `Bbc3` in `myc_mouse/scripts/44` from independent
+> western-blot evidence. The paragraph below is kept as written, and the
+> corrected reading follows it.
+
 `BCL2L11` was a **pre-registered negative control that came out positive**. That
 makes its result legitimate to report. It does not make it a hypothesis.
 
@@ -201,6 +304,21 @@ interesting than the expected one.
 
 So: reported as a specificity failure of the mouse model, in the informative
 direction. Not promoted, not given a panel, not written into the abstract.
+
+**Corrected reading, after section 0(a).** The prohibition on a fifth post-hoc
+hypothesis still binds, and BIM still gets no panel until it replicates. But the
+accurate description is no longer "a negative control that fired". It is:
+
+> The mechanism H1 encodes - `MYC x OXPHOS` raises BH3-only-to-BCL-XL priming -
+> **is supported in human tumours, with BIM rather than PUMA as the effector.**
+> The specific endpoint pre-registered in this arm, PUMA/BCL-XL, is not
+> supported. BIM was a co-candidate named in advance by the mouse arm on
+> independent protein data; this arm's plan mis-classified it.
+
+Three caveats travel with that sentence wherever it goes: the BIM fits are S1
+only and untested across the D7 proliferation specifications; the mouse's own
+*RNA* evidence for BIM was weak (p = 0.46), so the prior is protein-level; and
+the independent-cohort replication in section 9 has not run.
 
 ## 9. PRE-REGISTERED REPLICATION, declared 2026-08-29
 
