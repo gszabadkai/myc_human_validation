@@ -250,6 +250,13 @@ follow-up; the PanCanAtlas Clinical Data Resource (Liu et al. 2018, Cell) recomm
 PFI over OS for BRCA for exactly this reason. Verify the recommended endpoint against
 the CDR paper before use. Survival work belongs in METABRIC and SCAN-B.
 
+> **VERIFIED 2026-08-29.** The CDR is now snapshotted at `data/tcga_cdr/`. Counted from
+> it, BRCA has **151 OS / 83 DSS / 84 DFI / 145 PFI events** at a median follow-up of
+> ~843 days (~2.3 years). The caveat stands and is now quantified. The CDR authors'
+> own wording confirms the endpoint: *"Given the relatively short follow-up time, PFI
+> is preferred over OS."* The snapshot exists for **F4 (descriptive) and for stage /
+> grade / histology covariates**, not to reopen this decision.
+
 ### Confounding-by-indication caveat
 
 Chemotherapy assignment in METABRIC and SCAN-B is not randomised; sicker patients get
@@ -518,6 +525,16 @@ and forkscale values.
 MCbiclust is a genuine fidelity risk (different run, seed, sample QC) and must be
 documented as a limitation. Under the 3-panel budget, a failed G3 is a reason to drop
 ED2 rather than to spend a week on it.
+
+> **G3 RESOLVED 2026-08-29 - PASSES, and wider than assumed.** See
+> `docs/2026-08-29_G3_result_forkscale_availability.md`. Stored per-sample `pc1` and
+> `index` exist for **TCGA as well as METABRIC**; this section and Block D both assumed
+> METABRIC-only. TCGA is complete at n = 1,037, all of whom sit inside our 1,095-patient
+> covariate table. Snapshotted to `data/menegollo_biclusters/`, pinned to upstream commit
+> `8fdbb3437ae5537055d5d5429411bdb3b333c04a` and verified against upstream blob SHAs.
+> `forkscale = pc1 / index`, confirmed by recomputation (max abs diff 0). Nothing is
+> re-derived, so the section 13 fidelity landmine is void. METABRIC is one file short -
+> the sample identifier vector; see the note's section 5.
 
 ---
 
@@ -857,6 +874,14 @@ will look for.
 Use **continuous forkscale**, not fork membership. The PARADIGM analysis in Menegollo
 Fig 3A ran on 250 TCGA samples; that is thin for an interaction with this covariate set.
 
+> **AMENDED 2026-08-29 (G3).** The thinness constraint is gone. Stored continuous
+> forkscale exists for **1,037 TCGA patients**, all inside our 1,095, so Block D runs on
+> the TCGA analysis set (overlap with the 938 is at least 880; script 15 reports it
+> exactly) rather than on 250. Script 15 also carries the **F3-pre** redundancy check -
+> an exposure-side diagnostic with no outcome variable in it, declared in the G3 note
+> section 4. Fix the MB3 sign convention explicitly; it is not comparable across cohorts
+> as stored.
+
 ```
 PRIME ~ MYC * OXPHOS * MB2_forkscale + covariates
 PRIME ~ MYC * OXPHOS * MB3_forkscale + covariates    # ER-neutral control axis
@@ -965,7 +990,13 @@ Do not build 09 before G1 and G2 return. Do not build 13 before F3 returns.
   STATE in script 11 and never revise it after seeing outcome data.
 - **Redundancy with Menegollo Fig 7.** F3 is the guard. Run it first.
 - **Re-derived forkscale.** If G3 fails and MCbiclust is re-run, the result is a new
-  bicluster solution, not the published one.
+  bicluster solution, not the published one. **VOID 2026-08-29 - G3 passed.** The
+  published values are snapshotted and used as published; nothing is re-derived. Three
+  *different* forkscale traps replace this one, all in
+  `data/menegollo_biclusters/README.md`: `forkscale.log` is `Inf` at `index == 1` (and
+  `Inf` is not `NA`, so `complete.cases()` will not catch it); MB3's sign convention
+  differs between TCGA and METABRIC, which matters because MB3 is Block D's ER-neutral
+  control axis; and `forkscale` is severely skewed by construction.
 
 ---
 

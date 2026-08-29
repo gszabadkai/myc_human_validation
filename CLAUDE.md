@@ -29,17 +29,32 @@ prevent wrong-species errors.
 
 ## Current phase
 
-Setup and gates. Nothing downstream of the gates should be built yet.
+**All three gates are discharged. Scripts 00–10 are written and run.** Updated
+2026-08-29.
 
-Run first, in order (see plan sections 6 and 12):
-- **G1** — MYC signature overlap audit (script 04). Decides whether the Felsher
-  signature survives as a primary MYC estimator.
-- **G2** — MYC/MCL1/BCL2L1 CNV co-occurrence (script 05). Pure GISTIC, no expression.
-  Decides whether H1 or H2 becomes the Panel b figure.
-- **G3** — forkscale availability from `github.com/gszabadkai/Menegollo_Bentham`.
+| Gate | Outcome | Note |
+|---|---|---|
+| **G1** MYC signature overlap | passed, with D2 | `docs/2026-08-28_G1_result_and_decisions.md` |
+| **G2** MYC/MCL1/BCL2L1 CNV co-occurrence | **passed**; BBC3 fails | `docs/2026-08-28_G2_result.md` |
+| **G3** forkscale availability | **passed**, wider than assumed — TCGA too, not METABRIC-only | `docs/2026-08-29_G3_result_forkscale_availability.md` |
 
-Do not build script 09 before G1 and G2 return. Do not build script 13 before the F3
-incremental-value check returns.
+Where the science stands, so that nothing is re-derived by accident:
+
+- **H1 is falsified on both clauses** (Block C and Block B). **H2 and H3 are not
+  supported.** The reverse "escape" reading is not supported either. **Three of the four
+  falsification criteria are met; only H4 is untested.**
+- **One finding survives both instruments:** `MYC x OXPHOS` associates with **lower
+  BCL-XL and higher BIM**, PUMA unmoved, with no compensating amplification. BIM is
+  pre-specified in the mouse arm (`myc_mouse/scripts/44`), not a fishing result.
+- Two results were reported and **deliberately not pursued** (`Glycine metabolism`,
+  `Folate and 1-C`). Chasing either is the fifth post-hoc hypothesis section 2 forbids.
+- **One live commitment:** the BIM replication declared in the Block C note section 9.
+  Honour it or delete it; do not amend it.
+
+Next: script 15 (F3-pre redundancy check + Block D) and script 14 (DepMap / Block G) in
+parallel; then script 11 (freeze STATE); then METABRIC and F3 proper.
+
+Do not build script 13 before F3 returns. **F3 is a stop gate, not a robustness check.**
 
 ## Workflow — "Option A" (do not deviate)
 
@@ -99,6 +114,8 @@ here, do not edit them in place. If a source changes, re-snapshot rather than pa
 | Human MitoCarta 3.0 | `data/mitocarta_human/` | Broad, `Human.MitoCarta3.0.xls`, 1,136 genes / 149 pathways |
 | CollecTRI regulons | `data/collectri_human/` | OmniPath web service, dated snapshot, 1,201 TFs |
 | Felsher MYC signature | `data/genesets_from_library_human/` | `mammary_geneset_library` tag `v1.0` (`cbd8f16d…`), 67 genes |
+| Menegollo bicluster forkscale | `data/menegollo_biclusters/` | `gszabadkai/Menegollo_Bentham` @ `8fdbb343…`, TCGA n=1,037 + METABRIC PC1 |
+| TCGA Clinical Data Resource | `data/tcga_cdr/` | GDC PanCanAtlas, Liu et al. 2018 Cell. **F4 and covariates only — not TCGA survival** |
 
 ### The library's human GMT tree is mouse-derived — do not use it
 
@@ -177,6 +194,8 @@ data/
   mitocarta_human/              Human MitoCarta 3.0 xls + provenance README
   collectri_human/              CollecTRI snapshot (tsv.gz) + provenance README
   genesets_from_library_human/  library v1.0 human assets + provenance README
+  menegollo_biclusters/         companion-paper MCbiclust pc1/index + provenance README
+  tcga_cdr/                     TCGA Clinical Data Resource + provenance README
 functions/  shared utilities
 external/   vendored reference code (mitotyping / Monzel et al.) — reference, not to edit
 results/    intermediate .rds (gitignored, generated at runtime)
