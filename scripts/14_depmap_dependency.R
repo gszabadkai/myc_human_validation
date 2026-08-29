@@ -152,7 +152,14 @@ ARM_NEGATIVE <- "OXPHOS assembly factors"
 INSTRUMENTS  <- c("gsva", "mitopps")
 CI_LEVEL     <- 0.95
 MIN_LINES    <- 25L   # below this an interaction is not worth fitting at all
-GSVA_MIN_SET <- 5L    # a GSVA score on fewer genes is noise with a name
+# MATCHES script 07's G7_MIN_SET_GENES (3L), and must. If this were stricter,
+# `CII subunits` would be dropped here and not in TCGA - and that is not merely
+# a missing arm. mitoPPS is a COMPOSITION measure over a declared universe, so
+# removing one arm changes every other arm's value, and the CCLE and TCGA arms
+# would stop being the same quantity. Complex II has exactly four nuclear-encoded
+# subunits (SDHA, SDHB, SDHC, SDHD); it is a small set, not a broken one.
+GSVA_MIN_SET <- 3L
+MIN_SET_FRAC <- 0.80  # coverage below this is a harmonisation failure, not attrition
 
 # =============================================================================
 # 1. Inputs
@@ -425,15 +432,40 @@ message("   E_LOG ", nrow(E_LOG), " x ", ncol(E_LOG),
 message("\n4. scoring")
 
 .present <- function(s) intersect(s, rownames(E_LOG))
-sets_gsva <- c(list(MYC = MYC_SET, PROLIF = PROLIF), ARM_SETS)
-sets_gsva <- lapply(sets_gsva, .present)
-short <- names(sets_gsva)[lengths(sets_gsva) < 5L]
-if (length(short)) {
-  stop("gene set(s) with fewer than 5 genes present in CCLE: ",
-       paste(short, collapse = ", "), ". Symbol harmonisation has failed; a ",
-       "GSVA score on 2 genes is noise with a name.", call. = FALSE)
+sets_defined <- c(list(MYC = MYC_SET, PROLIF = PROLIF), ARM_SETS)
+sets_gsva    <- lapply(sets_defined, .present)
+
+# Two different failures, which the fraction separates and a bare count does not:
+# a set can be SMALL because that is how many genes the pathway has, or it can be
+# small because symbols did not harmonise. Complex II is the first kind - 4 of 4
+# genes present is perfect coverage, not a broken lookup.
+coverage <- tibble::tibble(
+  set = names(sets_defined),
+  n_defined = lengths(sets_defined),
+  n_ccle = lengths(sets_gsva),
+  frac = round(lengths(sets_gsva) / lengths(sets_defined), 3))
+
+lost <- coverage$set[coverage$frac < MIN_SET_FRAC]
+if (length(lost)) {
+  stop("gene set(s) below ", MIN_SET_FRAC, " coverage in CCLE: ",
+       paste(sprintf("%s (%d/%d)", lost,
+                     coverage$n_ccle[coverage$frac < MIN_SET_FRAC],
+                     coverage$n_defined[coverage$frac < MIN_SET_FRAC]),
+             collapse = ", "),
+       ". That is a symbol-harmonisation failure, not natural attrition.",
+       call. = FALSE)
 }
-message("   set coverage in CCLE, min ", min(lengths(sets_gsva)), " genes")
+tiny <- coverage$set[coverage$n_ccle < GSVA_MIN_SET]
+if (length(tiny)) {
+  stop("gene set(s) with fewer than ", GSVA_MIN_SET, " genes in CCLE: ",
+       paste(tiny, collapse = ", "), ". Too few to score, and dropping an arm ",
+       "would change the mitoPPS universe and so every other arm's value.",
+       call. = FALSE)
+}
+message("   set coverage in CCLE: worst ", min(coverage$frac), " (",
+        coverage$set[which.min(coverage$frac)], "), smallest ",
+        min(coverage$n_ccle), " genes (",
+        coverage$set[which.min(coverage$n_ccle)], ")")
 
 # --- GSVA. LOG SCALE. -------------------------------------------------------
 gp <- GSVA::gsvaParam(exprData = E_LOG, geneSets = sets_gsva,
@@ -778,6 +810,7 @@ out <- list(
   coefficients = coefs,
   declared     = declared,
   scores       = list(gsva = GS, mitopps = PPS, lines = lines),
+  coverage     = coverage,
   lines        = tibble::tibble(
     lineage = LINEAGE, n_model = length(breast), n_expr = length(lines),
     n_crispr = length(dep_lines), n_pan = length(pan_lines)),

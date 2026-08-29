@@ -117,6 +117,25 @@ strings `"Yes"`/`"No"`, not `TRUE`/`FALSE`.** Three consequences, all handled:
 Verified on the real file: 1,775 rows collapse to **1,719 models**, 19,215 gene
 columns, values 0.000-17.361 (consistent with log2(TPM+1)), no NAs.
 
+## Gene-set coverage in CCLE, measured
+
+All 20 sets (18 MitoCarta arms + the MYC signature + PROLIF_DISJOINT) resolve
+cleanly against the 19,215 protein-coding symbols in the 26Q1 matrix. Worst
+coverage is `CV subunits` at 17/19 = 0.895; everything else is 0.95 or better,
+and eleven sets are at 1.000.
+
+**`CII subunits` is 4 genes, and that is correct** - Complex II has exactly four
+nuclear-encoded subunits (SDHA, SDHB, SDHC, SDHD), and all four are present
+(4/4). Script 14's minimum set size is therefore **3**, matching script 07's
+`G7_MIN_SET_GENES`, and it must match: mitoPPS is a composition measure over a
+declared universe, so dropping one arm changes every other arm's value and the
+CCLE and TCGA arms would stop being the same quantity.
+
+The size check is on **coverage fraction**, not a bare count, because the two
+failures are different: a set can be small because the pathway is small, or
+small because symbols did not harmonise. Below 0.80 coverage the script stops
+as a harmonisation failure; below 3 genes present it stops as unscoreable.
+
 ## Line counts in 26Q1, measured
 
 | | n |
