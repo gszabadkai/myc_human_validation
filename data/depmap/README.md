@@ -74,13 +74,12 @@ these would have failed silently rather than erroring.
 1. **The expression file was renamed.**
    `OmicsExpressionProteinCodingGenesTPMLogp1.csv` (24Q4) is now
    `OmicsExpressionTPMLogp1HumanProteinCodingGenes.csv` (26Q1).
-2. **Its shape changed: it is now ONE ROW PER SEQUENCING PROFILE.** Columns are
-   `ProfileID`, `is_default_entry`, `ModelID`, then one column per gene. In 24Q4
-   it was one row per model with the ModelID as an unnamed first column. Read
-   the old way, `ModelID` and `is_default_entry` would be taken for genes, and
-   any model with more than one profile would appear more than once - silently
-   duplicating lines and inflating n. Script 14 filters to
-   `is_default_entry` TRUE and asserts one row per ModelID afterwards.
+2. **Its shape changed: it is now ONE ROW PER SEQUENCING RUN, not per model.**
+   In 24Q4 it was one row per model with the ModelID as an unnamed first column.
+   Read the old way, the metadata columns would be taken for genes, and any
+   model with more than one run would appear more than once - silently
+   duplicating lines and inflating n. Script 14 filters on the model-level
+   default flag and asserts one row per ModelID afterwards.
 3. **There are now stranded and unstranded variants.** Script 14 uses the
    **unstranded** file (`EXPR_STRANDED <- FALSE`), because it is continuous with
    every earlier DepMap release and with the published CCLE analyses this block
@@ -88,10 +87,49 @@ these would have failed silently rather than erroring.
    turns out to cover materially more lines that is checkable rather than
    assumed. Do not mix them; whichever is used is recorded in the saved object.
 
-`is_default_entry` may arrive as logical or as the strings `"True"`/`"TRUE"`.
-Script 14 handles both and refuses anything else - this repo has already been
-bitten once by testing `== "True"` against a column that had been parsed as
-logical, where the result was a silent all-FALSE.
+## The 26Q1 release notes misdescribe their own expression file
+
+Found on 2026-08-30, when script 14's column guard fired. The notes
+(`docs/README_depmap-public-26Q1.txt`) say the columns are *"ProfileID,
+is_default_entry, ModelID and then a column per gene"*. The shipped file begins:
+
+```
+<unnamed 0-based index>, SequencingID, ModelConditionID, ModelID,
+IsDefaultEntryForMC, IsDefaultEntryForModel, then "SYMBOL (ENTREZ)" columns
+```
+
+**There is no `ProfileID` and no `is_default_entry`, and the flags are the
+strings `"Yes"`/`"No"`, not `TRUE`/`FALSE`.** Three consequences, all handled:
+
+- Script 14 locates columns **by name with fallbacks** and decides what is a
+  gene by testing that the column is **numeric**, not by matching a name
+  pattern. A newly added metadata column stops the script rather than becoming a
+  gene.
+- The flag reader accepts logical, numeric, `Yes/No`, `True/False`, `1/0`, and
+  **refuses anything else rather than guessing**. This repo has already been
+  bitten once by testing `== "True"` against a column parsed as logical, where
+  the result was a silent all-FALSE - and here a `"Yes"`/`"No"` file would have
+  produced exactly that.
+- It filters on **`IsDefaultEntryForModel`, not `IsDefaultEntryForMC`**. The
+  latter is the model-*condition* default, a different and larger set; in 26Q1
+  exactly one row differs between them.
+
+Verified on the real file: 1,775 rows collapse to **1,719 models**, 19,215 gene
+columns, values 0.000-17.361 (consistent with log2(TPM+1)), no NAs.
+
+## Line counts in 26Q1, measured
+
+| | n |
+|---|---|
+| Breast models in `Model.csv` | 96 |
+| Breast with expression | 71 |
+| Breast with CRISPR | 53 |
+| **Breast with both - the Block G primary** | **51** |
+| **Pan-cancer with both - the powered secondary** | **1,140** |
+
+51 lines is above script 14's `MIN_LINES` floor of 25 but is genuinely small for
+a two-way interaction, which is exactly why the lineage-adjusted pan-cancer fit
+is reported alongside.
 
 ## Is the PRISM *secondary* (dose-response) screen needed? No.
 
@@ -154,9 +192,9 @@ shasum -a 256 data/raw/depmap/*.csv
 
 | File | Release | Bytes | SHA-256 |
 |---|---|---|---|
-| `Model.csv` | 26Q1 | | *fill in after download* |
-| `OmicsExpressionTPMLogp1HumanProteinCodingGenes.csv` | 26Q1 | | *fill in after download* |
-| `CRISPRGeneEffect.csv` | 26Q1 | | *fill in after download* |
+| `Model.csv` | 26Q1 | 697,455 | `ea4e0b2a3bc806f81df62689a5ae75f1a100135727a3d7b8a4c7ccc8815183f8` |
+| `OmicsExpressionTPMLogp1HumanProteinCodingGenes.csv` | 26Q1 | 305,007,605 | `0377be80c525fde98cbd2c6e8b06bdf2a4014a9683eb70182c1f8649d711021a` |
+| `CRISPRGeneEffect.csv` | 26Q1 | 440,646,050 | `e610a4cefb13a82b5b256b47eb08b63ff14843f8dbd0fb164bc0a32688e5b89e` |
 | `Repurposing_...Extended_Primary_Data_Matrix.csv` | 24Q2 | 72,456,953 | `3b6554cfc6c765af53088a676edc7bce00ee7d84fe808b93bbfa892de607bc3d` |
 | `Repurposing_...Extended_Primary_Compound_List.csv` | 24Q2 | 719,567 | `7e78f5901c1a97d2baab0789ab89832e716388da4eacaa9f094e7d2f2f5a3463` |
 | *superseded* `CRISPRGeneEffect_24Q4_figshare_SUPERSEDED.csv` | 24Q4 | 428,678,699 | `3d8f3ec6dbf2db7ff834b79b508622ec0b226f3518003fe96ecf5a4fcf167e3b` |

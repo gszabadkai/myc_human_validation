@@ -275,49 +275,101 @@ message("\n3. expression")
 }
 
 # 26Q1 CHANGED THE SHAPE OF THIS FILE, not just its name. It is now ONE ROW PER
-# SEQUENCING PROFILE - columns `ProfileID`, `is_default_entry`, `ModelID`, then
-# one column per gene - where 24Q4 and earlier were one row per model with the
-# ModelID as an unnamed first column.
+# SEQUENCING RUN, not per model, and it carries several metadata columns before
+# the genes start. In 24Q4 and earlier it was one row per model with the ModelID
+# as an unnamed first column.
 #
-# Two things break if that is read the old way, and neither is loud:
-#   - `ModelID` and `is_default_entry` would be taken for genes;
-#   - a model with more than one profile would appear more than once, so a
-#     lineage join would silently duplicate lines and inflate n.
-# Hence a dedicated reader that filters to the default profile per model and
-# asserts uniqueness afterwards.
+# THE 26Q1 RELEASE NOTES MISDESCRIBE THEIR OWN FILE. They say the columns are
+# "ProfileID, is_default_entry, ModelID and then a column per gene". The shipped
+# file (verified 2026-08-30) actually begins:
+#
+#   <unnamed 0-based index>, SequencingID, ModelConditionID, ModelID,
+#   IsDefaultEntryForMC, IsDefaultEntryForModel, then "SYMBOL (ENTREZ)" columns
+#
+# - there is no `ProfileID` and no `is_default_entry`, and the default flags are
+# the strings "Yes"/"No", not TRUE/FALSE. So this reader trusts the FILE, not
+# the notes: it locates columns by name, accepts several spellings of the flag,
+# and decides what is a gene by testing that the column is numeric.
+#
+# Three things break if this is read the old way, and only the first is loud:
+#   - ModelID and the flags would be taken for genes;
+#   - a model with more than one sequencing run would appear more than once, so
+#     a lineage join would silently duplicate lines and inflate n (1,775 rows
+#     against 1,719 models in 26Q1);
+#   - filtering on the wrong flag would take the MODEL CONDITION default rather
+#     than the MODEL default, which is a different and larger set.
+.is_true <- function(v, what) {
+  if (is.logical(v)) return(v)
+  if (is.numeric(v)) return(v == 1)
+  if (is.character(v)) {
+    x <- tolower(trimws(v))
+    ok <- c("yes", "true", "t", "1")
+    no <- c("no", "false", "f", "0", "")
+    bad <- setdiff(unique(x), c(ok, no))
+    if (length(bad)) {
+      stop(what, " has unrecognised value(s): ",
+           paste(utils::head(bad, 5), collapse = ", "),
+           ". Refusing to guess - a wrong guess here either empties the matrix ",
+           "or keeps every duplicate row.", call. = FALSE)
+    }
+    return(x %in% ok)
+  }
+  stop(what, " is ", class(v)[1], "; cannot be read as a flag.", call. = FALSE)
+}
+
 .read_expression <- function(path) {
   m <- data.table::fread(path, data.table = FALSE)
-  meta <- c("ProfileID", "is_default_entry", "ModelID")
-  if (!all(meta %in% names(m))) {
-    stop("expression file is missing ", paste(setdiff(meta, names(m)),
-         collapse = ", "), ". Expected the ", DEPMAP_RELEASE, " profile-level ",
-         "layout (ProfileID, is_default_entry, ModelID, then genes). If this ",
-         "is a pre-26Q1 file, it is one row per model with an unnamed first ",
-         "column and needs the old reader.", call. = FALSE)
+
+  if (!"ModelID" %in% names(m)) {
+    stop("expression file has no ModelID column. Columns start: ",
+         paste(utils::head(names(m), 8), collapse = ", "),
+         ". If this is a pre-26Q1 file it is one row per model with an unnamed ",
+         "first column and needs the old reader.", call. = FALSE)
   }
-  # `is_default_entry` may arrive as logical or as the strings "True"/"TRUE".
-  # This repo has already been bitten once by testing == "True" against a column
-  # that had been parsed as logical (script 08's CollecTRI sign trap), where the
-  # result was a silent all-FALSE. Handle both and refuse anything else.
-  d <- m$is_default_entry
-  keep <- if (is.logical(d)) d else
-    if (is.character(d)) tolower(trimws(d)) %in% c("true", "t", "1") else
-      stop("is_default_entry is ", class(d)[1], ", neither logical nor ",
-           "character. Inspect it before filtering; a wrong guess here empties ",
-           "the matrix or keeps every duplicate profile.", call. = FALSE)
+  flag_col <- intersect(c("IsDefaultEntryForModel", "is_default_entry"),
+                        names(m))[1]
+  if (is.na(flag_col)) {
+    stop("expression file has no model-level default-entry flag (looked for ",
+         "IsDefaultEntryForModel, is_default_entry). Columns start: ",
+         paste(utils::head(names(m), 8), collapse = ", "),
+         ". Without it, models with several sequencing runs would be counted ",
+         "more than once.", call. = FALSE)
+  }
+  # Deliberately NOT IsDefaultEntryForMC - that is the model-CONDITION default,
+  # a different and larger set. In 26Q1 one row differs between the two.
+  keep <- .is_true(m[[flag_col]], flag_col)
   if (!any(keep)) {
-    stop("no rows have is_default_entry TRUE - the filter matched nothing. ",
-         "Values seen: ", paste(utils::head(unique(as.character(d)), 5),
-                                collapse = ", "), call. = FALSE)
-  }
-  message("   ", sum(keep), " default profiles of ", nrow(m), " rows")
-  ids <- as.character(m$ModelID[keep])
-  if (anyDuplicated(ids)) {
-    stop(sum(duplicated(ids)), " ModelID(s) still duplicated after filtering to ",
-         "default profiles. Do not de-duplicate silently - find out why.",
+    stop("no rows have ", flag_col, " true - the filter matched nothing.",
          call. = FALSE)
   }
-  M <- as.matrix(m[keep, setdiff(names(m), meta), drop = FALSE])
+  message("   ", sum(keep), " default rows of ", nrow(m), " (flag: ", flag_col, ")")
+
+  ids <- as.character(m$ModelID[keep])
+  if (anyDuplicated(ids)) {
+    stop(sum(duplicated(ids)), " ModelID(s) still duplicated after filtering on ",
+         flag_col, ". Do not de-duplicate silently - find out why.",
+         call. = FALSE)
+  }
+
+  # What is a gene? Not a name test - names change between releases and the
+  # release notes are already known to be wrong about them. Gene columns are the
+  # numeric ones; every metadata column here is character or an index. Drop the
+  # known metadata by name, then require that nothing non-numeric survives, so a
+  # newly added metadata column stops the script instead of becoming a gene.
+  META <- c("V1", "", "ProfileID", "SequencingID", "ModelConditionID", "ModelID",
+            "IsDefaultEntryForMC", "IsDefaultEntryForModel", "is_default_entry")
+  gene_cols <- setdiff(names(m), META)
+  num_ok <- vapply(m[gene_cols], is.numeric, logical(1))
+  if (!all(num_ok)) {
+    stop("non-numeric column(s) survived the metadata filter and would be ",
+         "treated as genes: ", paste(utils::head(gene_cols[!num_ok], 5),
+                                     collapse = ", "),
+         ". Add them to META in .read_expression().", call. = FALSE)
+  }
+  message("   ", length(gene_cols), " gene columns, ", length(META),
+          " metadata names known")
+
+  M <- as.matrix(m[keep, gene_cols, drop = FALSE])
   rownames(M) <- ids
   colnames(M) <- trimws(sub("\\s*\\(\\d+\\)$", "", colnames(M)))
   dup <- duplicated(colnames(M))
