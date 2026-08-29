@@ -170,6 +170,16 @@ PRIME_vst <- as.numeric(E[PRIME_NUM, ] - E[PRIME_DEN, ])
 rho_scale <- stats::cor(PRIME, PRIME_vst, method = "spearman")
 message(sprintf("   sensitivity, PRIME on VST difference: Spearman rho = %.4f",
                 rho_scale))
+
+# --- the individual limbs, saved for script 09's limb-wise fits --------------
+# PRIME is close to a BBC3 readout - it correlates 0.838 with its numerator and
+# -0.128 with its denominator, because log2(BBC3) varies about twice as much as
+# log2(BCL2L1) - while the four negatives are genuine ratios. Script 09
+# pre-specifies fits on each limb alone so that asymmetry becomes a reported
+# quantity rather than a hidden one. They are saved here because 09 does no
+# scoring of its own.
+limbs <- t(log2(L[c(PRIME_NUM, PRIME_DEN, NEG_NUM), , drop = FALSE]))
+colnames(limbs) <- paste0("log2_", c(PRIME_NUM, PRIME_DEN, NEG_NUM))
 if (rho_scale < 0.95) {
   warning("PRIME on log2-linear and on the VST difference agree at rho = ",
           round(rho_scale, 3), ". The scale choice is load-bearing; report both ",
@@ -413,7 +423,7 @@ priming <- tibble::tibble(
   FOXO3_activity_raw     = FOXO3_activity_raw,
   FOXO3_mrna             = FOXO3_mrna
 ) %>%
-  dplyr::bind_cols(tibble::as_tibble(negatives))
+  dplyr::bind_cols(tibble::as_tibble(negatives), tibble::as_tibble(limbs))
 
 out <- list(
   priming      = priming,
