@@ -38,7 +38,7 @@
 # =============================================================================
 # SCALE DISCIPLINE - READ THIS BEFORE EDITING ANY SCORING BLOCK
 # =============================================================================
-# DepMap `OmicsExpressionProteinCodingGenesTPMLogp1.csv` is log2(TPM + 1).
+# DepMap `OmicsExpressionTPMLogp1HumanProteinCodingGenes.csv` is log2(TPM + 1).
 #
 #   GSVA      -> the file AS SUPPLIED. Log scale, kcdf = "Gaussian". Same as
 #                scripts 06-07 on VST.
@@ -73,24 +73,51 @@ message("\n14: Block G - DepMap functional dependency\n", strrep("=", 78))
 # -----------------------------------------------------------------------------
 DIR_DEPMAP <- file.path(DIR_DATA, "raw", "depmap")
 
-# Pinned release. `Model.csv`, the expression matrix and `CRISPRGeneEffect.csv`
-# must come from ONE release: Model IDs are stable but the line set and the
-# Chronos scaling are not, and mixing releases produces a join that looks
-# complete and is not.
+# Pinned release: DepMap Public 26Q1, the current portal release (its release
+# notes are snapshotted at docs/README_depmap-public-26Q1.txt). `Model.csv`, the
+# expression matrix and `CRISPRGeneEffect.csv` must come from ONE release: Model
+# IDs are stable but the line set and the Chronos scaling are not, and mixing
+# releases produces a join that looks complete and is not.
 #
-# PRISM IS THE ONE DELIBERATE EXCEPTION. Repurposing has its own release
-# cadence and `Repurposing Public 24Q2` is the current one - there is no 24Q4
-# Repurposing. It joins on ModelID, which is stable, so this is a different
-# dataset rather than a stale copy of this one. Recorded, not silently mixed.
-DEPMAP_RELEASE <- "24Q4"
+# PRISM IS THE ONE DELIBERATE EXCEPTION, and the gap is now large. Repurposing
+# has its own release cadence and `Repurposing Public 24Q2` (May 2024) is still
+# the latest - 26Q1 contains no drug-sensitivity data at all (verified against
+# the release notes). It joins on ModelID, which is stable, so this is a
+# different dataset rather than a stale copy of this one. The consequence is
+# only that models added since 24Q2 have no PRISM row: item 3 loses n, it does
+# not gain bias. Reported, not silently mixed.
+DEPMAP_RELEASE <- "26Q1"
 PRISM_RELEASE  <- "24Q2"
 
+# 26Q1 RENAMED the expression file and offers two variants:
+#   OmicsExpressionTPMLogp1HumanProteinCodingGenes.csv          unstranded
+#   OmicsExpressionTPMLogp1HumanProteinCodingGenesStranded.csv  strand-specific
+# (in 24Q4 and earlier this was OmicsExpressionProteinCodingGenesTPMLogp1.csv.)
+#
+# UNSTRANDED is used, deliberately: it is continuous with every earlier DepMap
+# release and with the published CCLE analyses this block is read beside, and it
+# is the larger library. Flip EXPR_STRANDED if the stranded file turns out to
+# cover materially more lines - the script reports the line count either way, so
+# that is checkable rather than assumed. Whichever is used is recorded in the
+# saved object; do not mix them.
+EXPR_STRANDED <- FALSE
+EXPR_FILE <- if (EXPR_STRANDED)
+  "OmicsExpressionTPMLogp1HumanProteinCodingGenesStranded.csv" else
+  "OmicsExpressionTPMLogp1HumanProteinCodingGenes.csv"
+
 PATH_MODEL  <- file.path(DIR_DEPMAP, "Model.csv")
-PATH_EXPR   <- file.path(DIR_DEPMAP, "OmicsExpressionProteinCodingGenesTPMLogp1.csv")
+PATH_EXPR   <- file.path(DIR_DEPMAP, EXPR_FILE)
 PATH_CRISPR <- file.path(DIR_DEPMAP, "CRISPRGeneEffect.csv")
 # Optional. Block G item 3. Absent -> section 6 is skipped, not faked.
 PATH_PRISM  <- file.path(DIR_DEPMAP, "Repurposing_Public_24Q2_Extended_Primary_Data_Matrix.csv")
 PATH_PRISM_TREAT <- file.path(DIR_DEPMAP, "Repurposing_Public_24Q2_Extended_Primary_Compound_List.csv")
+
+# The 24Q4 CRISPRGeneEffect.csv fetched from figshare on 2026-08-29, before the
+# portal release was checked. figshare never mirrored past 24Q4, so it is not a
+# 26Q1 file. It has been renamed with a _SUPERSEDED suffix, but a re-download
+# under the original name would resurrect it silently - and nothing inside the
+# file records its release. Guard on the one thing that does distinguish it.
+CRISPR_24Q4_BYTES <- 428678699
 
 LINEAGE <- "Breast"
 
@@ -139,27 +166,23 @@ GSVA_MIN_SET <- 5L    # a GSVA score on fewer genes is noise with a name
 # guard below catches exactly that. figshare works from the command line.
 message("\n1. inputs")
 
-# Verified 2026-08-29: figshare carries ONLY the Achilles/CRISPR half of every
-# DepMap release - the omics matrices and Model.csv are portal-only, and the
-# portal is behind a Cloudflare challenge. So two files need a browser and
-# three do not. PRISM Repurposing, by contrast, is complete on figshare.
+# Verified 2026-08-30: figshare's latest DepMap mirror is 24Q4 (Dec 2024) - it
+# never mirrored 25Qx or 26Q1 - so the portal is the ONLY source for the current
+# release, and it is behind a Cloudflare challenge. All three DepMap files need
+# a browser. PRISM Repurposing is a separate release and IS on figshare.
 .acquire_help <- paste0(
   "\n\nAcquisition, into ", DIR_DEPMAP, ":\n\n",
-  "  BROWSER (2 files - portal only, Cloudflare-gated):\n",
-  "    https://depmap.org/portal/data_page/?tab=allData   release ",
-  DEPMAP_RELEASE, "\n",
+  "  BROWSER - DepMap ", DEPMAP_RELEASE, ", 3 files. The portal is the only\n",
+  "  source for this release; figshare stops at 24Q4.\n",
+  "    https://depmap.org/portal/data_page/?tab=allData\n",
   "      Model.csv\n",
-  "      OmicsExpressionProteinCodingGenesTPMLogp1.csv\n\n",
-  "  SCRIPTABLE (3 files - figshare, direct):\n",
-  "    curl -L -o CRISPRGeneEffect.csv \\\n",
-  "      https://ndownloader.figshare.com/files/51064667      # DepMap ",
-  DEPMAP_RELEASE, "\n",
+  "      ", EXPR_FILE, "\n",
+  "      CRISPRGeneEffect.csv\n\n",
+  "  SCRIPTABLE - PRISM Repurposing ", PRISM_RELEASE, ", 2 files (optional):\n",
   "    curl -L -o Repurposing_Public_24Q2_Extended_Primary_Data_Matrix.csv \\\n",
-  "      https://ndownloader.figshare.com/files/46630984      # PRISM ",
-  PRISM_RELEASE, "\n",
+  "      https://ndownloader.figshare.com/files/46630984\n",
   "    curl -L -o Repurposing_Public_24Q2_Extended_Primary_Compound_List.csv \\\n",
-  "      https://ndownloader.figshare.com/files/46630981      # PRISM ",
-  PRISM_RELEASE, "\n\n",
+  "      https://ndownloader.figshare.com/files/46630981\n\n",
   "Checksums and the full story are in data/depmap/README.md.")
 
 for (p in c(PATH_MODEL, PATH_EXPR, PATH_CRISPR)) {
@@ -172,7 +195,20 @@ for (p in c(PATH_MODEL, PATH_EXPR, PATH_CRISPR)) {
          call. = FALSE)
   }
 }
-message("   3 required inputs present")
+if (identical(as.numeric(file.size(PATH_CRISPR)), as.numeric(CRISPR_24Q4_BYTES))) {
+  stop("CRISPRGeneEffect.csv is exactly ", CRISPR_24Q4_BYTES, " bytes, which is ",
+       "the DepMap 24Q4 figshare file, not ", DEPMAP_RELEASE, ". Nothing inside ",
+       "the file records its release, so this size is the only signal. Replace ",
+       "it with the ", DEPMAP_RELEASE, " file from the portal.", .acquire_help,
+       call. = FALSE)
+}
+message("   3 required inputs present (DepMap ", DEPMAP_RELEASE,
+        ", expression = ", EXPR_FILE, ")")
+for (p in c(PATH_MODEL, PATH_EXPR, PATH_CRISPR)) {
+  message("     ", basename(p), "  ", format(file.size(p), big.mark = ","),
+          " bytes  ", format(file.mtime(p), "%Y-%m-%d"))
+}
+message("   confirm those sizes against the table in data/depmap/README.md")
 
 have_prism <- file.exists(PATH_PRISM) && file.exists(PATH_PRISM_TREAT)
 message("   PRISM drug sensitivity: ", if (have_prism) "present" else
@@ -217,9 +253,15 @@ message("   ", length(breast), " ", LINEAGE, " models in Model.csv (of ",
 # =============================================================================
 message("\n3. expression")
 
+# CRISPR and PRISM only. The expression matrix has its own reader; see below.
 .read_matrix <- function(path, what) {
   m <- data.table::fread(path, data.table = FALSE)
-  rn <- m[[1]]; m <- as.matrix(m[, -1, drop = FALSE])
+  # The id column is unnamed in the files seen so far, so fread calls it V1.
+  # Tolerate it being named, but never mistake a gene column for the id.
+  if (names(m)[1] %in% c("ModelID", "depmap_id")) {
+    message("   ", what, ": id column is named '", names(m)[1], "'")
+  }
+  rn <- as.character(m[[1]]); m <- as.matrix(m[, -1, drop = FALSE])
   rownames(m) <- rn
   # DepMap column names are "SYMBOL (ENTREZ)". Take the symbol.
   colnames(m) <- trimws(sub("\\s*\\(\\d+\\)$", "", colnames(m)))
@@ -232,7 +274,62 @@ message("\n3. expression")
   m
 }
 
-EXPR <- .read_matrix(PATH_EXPR, "expression")   # models x genes, log2(TPM+1)
+# 26Q1 CHANGED THE SHAPE OF THIS FILE, not just its name. It is now ONE ROW PER
+# SEQUENCING PROFILE - columns `ProfileID`, `is_default_entry`, `ModelID`, then
+# one column per gene - where 24Q4 and earlier were one row per model with the
+# ModelID as an unnamed first column.
+#
+# Two things break if that is read the old way, and neither is loud:
+#   - `ModelID` and `is_default_entry` would be taken for genes;
+#   - a model with more than one profile would appear more than once, so a
+#     lineage join would silently duplicate lines and inflate n.
+# Hence a dedicated reader that filters to the default profile per model and
+# asserts uniqueness afterwards.
+.read_expression <- function(path) {
+  m <- data.table::fread(path, data.table = FALSE)
+  meta <- c("ProfileID", "is_default_entry", "ModelID")
+  if (!all(meta %in% names(m))) {
+    stop("expression file is missing ", paste(setdiff(meta, names(m)),
+         collapse = ", "), ". Expected the ", DEPMAP_RELEASE, " profile-level ",
+         "layout (ProfileID, is_default_entry, ModelID, then genes). If this ",
+         "is a pre-26Q1 file, it is one row per model with an unnamed first ",
+         "column and needs the old reader.", call. = FALSE)
+  }
+  # `is_default_entry` may arrive as logical or as the strings "True"/"TRUE".
+  # This repo has already been bitten once by testing == "True" against a column
+  # that had been parsed as logical (script 08's CollecTRI sign trap), where the
+  # result was a silent all-FALSE. Handle both and refuse anything else.
+  d <- m$is_default_entry
+  keep <- if (is.logical(d)) d else
+    if (is.character(d)) tolower(trimws(d)) %in% c("true", "t", "1") else
+      stop("is_default_entry is ", class(d)[1], ", neither logical nor ",
+           "character. Inspect it before filtering; a wrong guess here empties ",
+           "the matrix or keeps every duplicate profile.", call. = FALSE)
+  if (!any(keep)) {
+    stop("no rows have is_default_entry TRUE - the filter matched nothing. ",
+         "Values seen: ", paste(utils::head(unique(as.character(d)), 5),
+                                collapse = ", "), call. = FALSE)
+  }
+  message("   ", sum(keep), " default profiles of ", nrow(m), " rows")
+  ids <- as.character(m$ModelID[keep])
+  if (anyDuplicated(ids)) {
+    stop(sum(duplicated(ids)), " ModelID(s) still duplicated after filtering to ",
+         "default profiles. Do not de-duplicate silently - find out why.",
+         call. = FALSE)
+  }
+  M <- as.matrix(m[keep, setdiff(names(m), meta), drop = FALSE])
+  rownames(M) <- ids
+  colnames(M) <- trimws(sub("\\s*\\(\\d+\\)$", "", colnames(M)))
+  dup <- duplicated(colnames(M))
+  if (any(dup)) {
+    message("   expression: ", sum(dup), " duplicate symbols after stripping ",
+            "Entrez ids - first occurrence kept")
+    M <- M[, !dup, drop = FALSE]
+  }
+  M
+}
+
+EXPR <- .read_expression(PATH_EXPR)             # models x genes, log2(TPM+1)
 message("   expression: ", nrow(EXPR), " models x ", ncol(EXPR), " genes")
 
 # A sanity check on the scale, because everything below depends on it and the
@@ -634,6 +731,9 @@ out <- list(
     n_crispr = length(dep_lines), n_pan = length(pan_lines)),
   spec = list(
     release   = DEPMAP_RELEASE,
+    expression_file = EXPR_FILE,
+    expression_strandedness = if (EXPR_STRANDED) "strand-specific" else
+                              "unstranded (continuous with pre-26Q1 releases)",
     prediction = "plan section 10: negative MYC:OX on MCL1 / BCL2L1 gene effect",
     two_sided = paste("Block C found LOWER BCL2L1 transcript under MYC x",
                       "OXPHOS; dependency and supply are different quantities",
