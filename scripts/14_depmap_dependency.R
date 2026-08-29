@@ -814,6 +814,11 @@ out <- list(
   lines        = tibble::tibble(
     lineage = LINEAGE, n_model = length(breast), n_expr = length(lines),
     n_crispr = length(dep_lines), n_pan = length(pan_lines)),
+  # The IDs themselves, not just the counts. `scores$lines` is the 71 lines with
+  # EXPRESSION; `dep_lines` is the 51 that also have CRISPR. They are different
+  # vectors and indexing the CRISPR matrix with the wrong one is a subscript
+  # error - which is exactly what the sandbox did on first use.
+  line_ids     = list(expr = lines, crispr = dep_lines, pan = pan_lines),
   spec = list(
     release   = DEPMAP_RELEASE,
     expression_file = EXPR_FILE,
@@ -868,23 +873,37 @@ if (FALSE) {
   # If MCL1 and BCL2L1 are near-zero gene effect across every breast line,
   # there is no dependency to modify and G-a / G-b are null by construction
   # rather than by result. Look before interpreting.
+  #
+  # NOTE the line vector. `g$scores$lines` is the 71 lines with EXPRESSION;
+  # only 51 of those are in the CRISPR matrix. Index with `line_ids$crispr`.
   cr <- data.table::fread(file.path(DIR_DATA, "raw", "depmap",
                                     "CRISPRGeneEffect.csv"), data.table = FALSE)
   rn <- cr[[1]]; cr <- as.matrix(cr[, -1]); rownames(cr) <- rn
   colnames(cr) <- trimws(sub("\\s*\\(\\d+\\)$", "", colnames(cr)))
-  boxplot(cr[g$scores$lines, c("MCL1", "BCL2L1", "BCL2", "RPL3")],
-          ylab = "Chronos gene effect", main = "breast lines")
+  dl <- g$line_ids$crispr
+  boxplot(cr[dl, c("MCL1", "BCL2L1", "BCL2", "BCL2L11", "RPL3")],
+          ylab = "Chronos gene effect", main = "breast lines (n = 51)")
   abline(h = c(0, -1), lty = c(1, 2))
 
   # --- the interaction, drawn, because n is small --------------------------
-  # At ~50 lines a single leverage point can carry the whole coefficient.
-  # Plot it before believing it.
-  ox  <- g$scores$gsva["OXPHOS subunits", ]
-  myc <- g$scores$gsva["MYC", ]
+  # At 51 lines a single leverage point can carry the whole coefficient.
+  # Plot it before believing it. Scores are subset to the CRISPR lines so the
+  # x and y vectors are the same length and the same lines.
+  ox  <- g$scores$gsva["OXPHOS subunits", dl]
+  myc <- g$scores$gsva["MYC", dl]
   hi  <- myc > stats::median(myc)
-  plot(ox, cr[g$scores$lines, "BCL2L1"], col = ifelse(hi, "red", "grey40"),
+  plot(ox, cr[dl, "BCL2L1"], col = ifelse(hi, "red", "grey40"),
        pch = 16, xlab = "OXPHOS subunits (GSVA, CCLE-relative)",
        ylab = "BCL2L1 gene effect")
+  legend("topright", c("MYC high", "MYC low"), col = c("red", "grey40"), pch = 16)
+
+  # --- the one non-null in the panel, drawn the same way -------------------
+  # BCL2L11 on mitoPPS is the only coefficient in the breast panel with a CI
+  # clear of zero. It is a CONTROL gene, not a declared endpoint, and it has no
+  # matched null. Look at whether a handful of lines carry it.
+  oxp <- g$scores$mitopps["OXPHOS subunits", dl]
+  plot(oxp, cr[dl, "BCL2L11"], col = ifelse(hi, "red", "grey40"), pch = 16,
+       xlab = "OXPHOS subunits (mitoPPS)", ylab = "BCL2L11 gene effect")
   legend("topright", c("MYC high", "MYC low"), col = c("red", "grey40"), pch = 16)
 
   # --- the arm panel as a rank ordering, which is all it is ----------------
@@ -907,6 +926,7 @@ if (FALSE) {
   # --- do the two instruments agree in CCLE at all? ------------------------
   # In TCGA they can move in opposite directions. Check here too, before any
   # "both instruments" claim is made.
+  # (these two are both over the 71 expression lines, so no subsetting needed)
   plot(g$scores$gsva["OXPHOS subunits", ],
        g$scores$mitopps["OXPHOS subunits", ], pch = 16,
        xlab = "GSVA", ylab = "mitoPPS")
