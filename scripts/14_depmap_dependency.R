@@ -73,10 +73,17 @@ message("\n14: Block G - DepMap functional dependency\n", strrep("=", 78))
 # -----------------------------------------------------------------------------
 DIR_DEPMAP <- file.path(DIR_DATA, "raw", "depmap")
 
-# Pinned release. Everything below must come from ONE release: Model IDs are
-# stable but the line set and the Chronos scaling are not, and mixing releases
-# produces a join that looks complete and is not.
+# Pinned release. `Model.csv`, the expression matrix and `CRISPRGeneEffect.csv`
+# must come from ONE release: Model IDs are stable but the line set and the
+# Chronos scaling are not, and mixing releases produces a join that looks
+# complete and is not.
+#
+# PRISM IS THE ONE DELIBERATE EXCEPTION. Repurposing has its own release
+# cadence and `Repurposing Public 24Q2` is the current one - there is no 24Q4
+# Repurposing. It joins on ModelID, which is stable, so this is a different
+# dataset rather than a stale copy of this one. Recorded, not silently mixed.
 DEPMAP_RELEASE <- "24Q4"
+PRISM_RELEASE  <- "24Q2"
 
 PATH_MODEL  <- file.path(DIR_DEPMAP, "Model.csv")
 PATH_EXPR   <- file.path(DIR_DEPMAP, "OmicsExpressionProteinCodingGenesTPMLogp1.csv")
@@ -94,9 +101,23 @@ DEP_CONTROL  <- c("BCL2",      # the specificity control, as in G2 and script 08
                   "BBC3", "BCL2L11", "BAX", "BAK1",
                   "RPL3", "POLR2A")   # common essentials: a floor, not a result
 
-# Block G item 3. Named in plan section 10.
-DRUGS <- c("S63845", "AMG-176", "AZD5991",          # MCL1
-           "A-1331852", "navitoclax", "A-1155463",  # BCL-XL
+# Block G item 3. Named in plan section 10, plus AZD5991 as a third MCL1 agent.
+#
+# COVERAGE, checked against Repurposing Public 24Q2 on 2026-08-29: 5 of these 7
+# are present. **A-1331852 and A-1155463 are NOT in PRISM Repurposing** - and
+# those are the two SELECTIVE BCL-XL inhibitors. What is left on the BCL-XL side
+# is navitoclax, which inhibits BCL2, BCL-XL and BCL-W and therefore CANNOT
+# separate BCL-XL from BCL2 on its own.
+#
+# That is a real limitation of item 3, not a detail. It is partly recoverable:
+# venetoclax IS present and is BCL2-selective, so navitoclax and venetoclax read
+# together bound the BCL-XL/BCL-W component - which is exactly the role plan
+# section 10 already assigns venetoclax. Read them as a pair; do not read a
+# navitoclax result as a BCL-XL result.
+#
+# MCL1 is well covered: S63845, AMG-176 and AZD5991 are all present.
+DRUGS <- c("S63845", "AMG-176", "AZD5991",          # MCL1, all 3 present
+           "A-1331852", "navitoclax", "A-1155463",  # BCL-XL; only navitoclax
            "venetoclax")                            # BCL2 specificity control
 
 ARM_PRIMARY  <- "OXPHOS subunits"
@@ -118,19 +139,28 @@ GSVA_MIN_SET <- 5L    # a GSVA score on fewer genes is noise with a name
 # guard below catches exactly that. figshare works from the command line.
 message("\n1. inputs")
 
+# Verified 2026-08-29: figshare carries ONLY the Achilles/CRISPR half of every
+# DepMap release - the omics matrices and Model.csv are portal-only, and the
+# portal is behind a Cloudflare challenge. So two files need a browser and
+# three do not. PRISM Repurposing, by contrast, is complete on figshare.
 .acquire_help <- paste0(
-  "\n\nAcquisition (DepMap ", DEPMAP_RELEASE, "), into ", DIR_DEPMAP, ":\n",
-  "  CRISPRGeneEffect.csv - figshare, scriptable:\n",
+  "\n\nAcquisition, into ", DIR_DEPMAP, ":\n\n",
+  "  BROWSER (2 files - portal only, Cloudflare-gated):\n",
+  "    https://depmap.org/portal/data_page/?tab=allData   release ",
+  DEPMAP_RELEASE, "\n",
+  "      Model.csv\n",
+  "      OmicsExpressionProteinCodingGenesTPMLogp1.csv\n\n",
+  "  SCRIPTABLE (3 files - figshare, direct):\n",
   "    curl -L -o CRISPRGeneEffect.csv \\\n",
-  "      \"$(curl -s https://api.figshare.com/v2/articles/27993248/files \\\n",
-  "         | python3 -c 'import json,sys;print([f[\"download_url\"] for f in ",
-  "json.load(sys.stdin) if f[\"name\"]==\"CRISPRGeneEffect.csv\"][0])')\"\n",
-  "  Model.csv and OmicsExpressionProteinCodingGenesTPMLogp1.csv - the portal\n",
-  "    is Cloudflare-gated, so download these in a BROWSER from\n",
-  "    https://depmap.org/portal/data_page/?tab=allData  (release ",
-  DEPMAP_RELEASE, ")\n",
-  "  PRISM (optional, Block G item 3) - same page, Repurposing Public.\n",
-  "Record URLs and SHA-256 in data/depmap/README.md before using any of it.")
+  "      https://ndownloader.figshare.com/files/51064667      # DepMap ",
+  DEPMAP_RELEASE, "\n",
+  "    curl -L -o Repurposing_Public_24Q2_Extended_Primary_Data_Matrix.csv \\\n",
+  "      https://ndownloader.figshare.com/files/46630984      # PRISM ",
+  PRISM_RELEASE, "\n",
+  "    curl -L -o Repurposing_Public_24Q2_Extended_Primary_Compound_List.csv \\\n",
+  "      https://ndownloader.figshare.com/files/46630981      # PRISM ",
+  PRISM_RELEASE, "\n\n",
+  "Checksums and the full story are in data/depmap/README.md.")
 
 for (p in c(PATH_MODEL, PATH_EXPR, PATH_CRISPR)) {
   if (!file.exists(p)) stop("missing input: ", p, .acquire_help, call. = FALSE)
@@ -480,11 +510,31 @@ if (!have_prism) {
             paste(utils::head(names(TREAT)), collapse = ", "),
             ") - item 3 skipped rather than guessed")
   } else {
+    # ORIENTATION: the Repurposing matrix is COMPOUNDS x CELL LINES - rows are
+    # `BRD:BRD-...` ids and columns are ModelIDs - which is the transpose of the
+    # expression and CRISPR matrices. Verified 2026-08-29: 6,790 x 919. Read
+    # without transposing, `intersect(lines, rownames(PR))` is empty and item 3
+    # silently reports "0 lines with PRISM" rather than failing. Hence the
+    # assertion, not just the t().
     PR <- data.table::fread(PATH_PRISM, data.table = FALSE)
     rn <- PR[[1]]; PR <- as.matrix(PR[, -1, drop = FALSE]); rownames(PR) <- rn
+    if (!all(grepl("^BRD", utils::head(rownames(PR), 20))) ||
+        !all(grepl("^ACH-", utils::head(colnames(PR), 20)))) {
+      stop("PRISM matrix orientation is not compounds x ModelIDs as expected ",
+           "(rows start '", substr(rownames(PR)[1], 1, 12), "', columns start '",
+           substr(colnames(PR)[1], 1, 12), "'). Check the release before ",
+           "transposing.", call. = FALSE)
+    }
+    PR <- t(PR)                                      # now ModelIDs x compounds
+    # Drug.Name is UPPERCASE for some compounds and mixed for others, hence the
+    # case-insensitive match on both sides.
     hit <- TREAT[tolower(TREAT[[nm_col]]) %in% tolower(DRUGS), , drop = FALSE]
+    absent <- setdiff(tolower(DRUGS), tolower(hit[[nm_col]]))
     message("   ", nrow(hit), " of ", length(DRUGS),
             " named compounds found in PRISM")
+    if (length(absent)) {
+      message("   NOT in this PRISM release: ", paste(absent, collapse = ", "))
+    }
     pr_lines <- intersect(lines, rownames(PR))
     message("   ", length(pr_lines), " ", LINEAGE, " lines with PRISM")
     if (nrow(hit) && length(pr_lines) >= MIN_LINES) {
@@ -598,7 +648,16 @@ out <- list(
                       "any positive OXPHOS result."),
     power     = paste(length(dep_lines), "breast lines; a null is not",
                       "evidence against"),
-    prism     = if (have_prism) "run" else "deferred - files absent"),
+    prism     = if (have_prism)
+                  paste("run; PRISM Repurposing", PRISM_RELEASE,
+                        "- its own release cadence, joined on ModelID")
+                else "deferred - files absent",
+    prism_gap = paste("A-1331852 and A-1155463, the two SELECTIVE BCL-XL",
+                      "inhibitors, are not in PRISM Repurposing. navitoclax is",
+                      "BCL2/BCL-XL/BCL-W and cannot separate BCL-XL from BCL2",
+                      "alone; read it against venetoclax, which is present and",
+                      "BCL2-selective. MCL1 is fully covered (S63845, AMG-176,",
+                      "AZD5991).")),
   built = Sys.time())
 
 saveRDS(out, file.path(DIR_RESULTS, "depmap_dependency.rds"))
