@@ -86,6 +86,11 @@ NEG_NUM   <- c("BID", "BAX", "BCL2L11", "BAK1")   # all over PRIME_DEN
 PRIMING_GENES <- unique(c(PRO_BH3_ONLY, PRO_EFFECTOR, ANTI_GUARD, ANTI_ER,
                           PRIME_NUM, PRIME_DEN, NEG_NUM))
 
+# Genes saved as individual log2 columns for the downstream model scripts. The
+# ratio limbs, plus the two anti-apoptotic guardians Block B models directly
+# (plan section 10). Scoring lives here, so 09 and 10 consume and never compute.
+LIMB_GENES <- unique(c(PRIME_NUM, PRIME_DEN, NEG_NUM, "MCL1", "BCL2"))
+
 # =============================================================================
 # 1. Inputs
 # =============================================================================
@@ -145,7 +150,7 @@ message("\n2. PRIME and the negative-control endpoints (log2 linear)")
   invisible(TRUE)
 }
 
-.assert_positive(c(PRIME_NUM, PRIME_DEN, NEG_NUM), "ratio endpoints")
+.assert_positive(LIMB_GENES, "ratio endpoints and saved limbs")
 
 .ratio <- function(num, den = PRIME_DEN) {
   as.numeric(log2(L[num, ]) - log2(L[den, ]))
@@ -178,8 +183,8 @@ message(sprintf("   sensitivity, PRIME on VST difference: Spearman rho = %.4f",
 # pre-specifies fits on each limb alone so that asymmetry becomes a reported
 # quantity rather than a hidden one. They are saved here because 09 does no
 # scoring of its own.
-limbs <- t(log2(L[c(PRIME_NUM, PRIME_DEN, NEG_NUM), , drop = FALSE]))
-colnames(limbs) <- paste0("log2_", c(PRIME_NUM, PRIME_DEN, NEG_NUM))
+limbs <- t(log2(L[LIMB_GENES, , drop = FALSE]))
+colnames(limbs) <- paste0("log2_", LIMB_GENES)
 if (rho_scale < 0.95) {
   warning("PRIME on log2-linear and on the VST difference agree at rho = ",
           round(rho_scale, 3), ". The scale choice is load-bearing; report both ",
