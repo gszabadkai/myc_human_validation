@@ -1,6 +1,6 @@
 ---
 date: 2026-08-30
-status: Block G PRIMARY RESULT recorded; BCL2L11 check DECLARED, not yet run
+status: Block G PRIMARY RESULT recorded; BCL2L11 check RUN (see section 5)
 relates-to:
   - 2026-08-27_human_validation_plan.md (sections 2, 10 Block G, 12)
   - 2026-08-29_block_c_result_H1_not_supported.md (section 0, section 9)
@@ -161,7 +161,83 @@ because the three main panels are about the breast axis.
   dependency in cell lines. Honour that separately or delete it; do not let this
   stand in for it.
 
-## 5. Status
+## 5. RESULT of the declared check, run 2026-08-30
 
-Block G's declared predictions **fail**, at adequate power. The BCL2L11 check is
-declared above and not yet run.
+| Model | Instrument | Estimate | 95% CI | p |
+|---|---|---|---|---|
+| breast (n=51) | mitoPPS | **+0.107** | 0.054, 0.159 | 0.00018 |
+| breast (n=51) | GSVA | +0.040 | -0.001, 0.080 | 0.055 |
+| **P1** pooled (n=1,127) | GSVA | +0.00037 | -0.0078, 0.0085 | 0.93 |
+| **P1** pooled | mitoPPS | -0.00003 | -0.0083, 0.0082 | 0.99 |
+| **P2** excl breast (n=1,076) | GSVA | +0.00055 | -0.0078, 0.0089 | 0.90 |
+| **P2** excl breast | mitoPPS | -0.00086 | -0.0093, 0.0076 | 0.84 |
+| **P3** breast vs rest (n=1,127) | GSVA | +0.021 | -0.024, 0.067 | 0.36 |
+| **P3** breast vs rest | mitoPPS | **+0.089** | 0.035, 0.143 | 0.0012 |
+
+By the rules in section 4.4 the machine verdict is **"P1 null - the breast
+BCL2L11 coefficient was noise at n = 51. Report as a negative and drop it."**
+That is the registered outcome and it stands as registered.
+
+### 5.1 CORRECTION - section 4.4's P1 row was a bad inference, and it was mine
+
+Written 2026-08-30, after the fit. **This does not change the registered verdict
+above.** It records that one line of the declaration was logically invalid, which
+is a different thing from disliking its answer.
+
+Section 4.4 says "P1 null -> the breast coefficient was noise at n = 51". **P1
+cannot show that.** P1 pools 51 breast lines into 1,127. If the effect were real
+and confined to breast, the pooled estimate would be diluted to roughly
+51/1127 x 0.107 = 0.005 - comfortably inside the observed CI of +/- 0.008. So
+**P1 was guaranteed to be null under both hypotheses** and had no discriminating
+power between them. Section 4.1's claim that this is "the same test that
+disposed of G-a and G-b" was wrong: G-a and G-b were predicted to hold
+pan-cancer, so a pooled null falsified them. This one was not.
+
+### 5.2 What the check DID establish
+
+**The effect is not universal.** P2 fits 1,076 non-breast lines and returns zero
+on both instruments with CIs of about +/- 0.008 - roughly a tenth of the breast
+estimate. That is a genuine, well-powered negative, and it directly answers the
+concern GS raised before the fit: there is no cross-lineage BIM effect here to be
+off topic about.
+
+### 5.3 What remains unresolved, and why P3 does not settle it
+
+Whether the breast +0.107 is real is **still open**, and nothing run here
+resolves it.
+
+P3 is not independent evidence. It uses the same 51 lines that produced the
+observation, and given breast at +0.107 and the rest at ~0, a significant
+breast-vs-rest contrast is close to arithmetically implied. It restates the
+input rather than testing it. P3 also **fails the two-instrument rule** - GSVA
++0.021, p 0.36 - and so does the breast result it is built on, where GSVA is
+only p 0.055.
+
+Two further reasons for restraint. The 14-row table above contains a nominally
+significant hit on the **negative control arm** (P2, assembly factors, mitoPPS:
+-0.0087, p 0.046). That is the multiplicity floor made visible. And mitoPPS is a
+composition measure, so a lineage with distinctive mitochondrial composition can
+move it for reasons that have nothing to do with the MYC/OXPHOS state - breast
+being one lineage among ~30 here.
+
+**No claim of breast-specificity is made or licensed.** Concluding "not
+universal, therefore breast-specific" from a null in the pooled fit would be the
+post-hoc rescue this declaration exists to prevent.
+
+### 5.4 What would actually settle it
+
+1. **The CCLE expression-matched null, in breast.** Already a standing
+   requirement (section 4.5). It asks the only question that matters at n = 51:
+   does +0.107 beat a random expression-matched gene set in these same lines?
+2. **A leverage check.** The sandbox plots BCL2L11 against mitoPPS OXPHOS for
+   the 51 lines; at that n a couple of points can carry the coefficient.
+3. **An independent breast dataset**, which is what the Block C note section 9
+   commitment is for - and that is transcript, not dependency, so it remains a
+   separate obligation.
+
+## 6. Status
+
+Block G's declared predictions **fail**, at adequate power. The BCL2L11 check
+returns a registered verdict of "noise, drop it"; that verdict's stated
+reasoning is corrected in 5.1 without changing the verdict. The effect is
+**established as not universal** and remains **unresolved in breast**.

@@ -923,9 +923,22 @@ message("\n8. save")
 out <- list(
   coefficients = coefs,
   declared     = declared,
-  bcl2l11_check = list(verdict = verdict, P1 = q1, P2 = q2, P3 = q3,
-                       declaration =
-                         "docs/2026-08-30_block_g_result_and_bcl2l11_declaration.md"),
+  bcl2l11_check = list(
+    verdict = verdict, P1 = q1, P2 = q2, P3 = q3,
+    declaration = "docs/2026-08-30_block_g_result_and_bcl2l11_declaration.md",
+    # The verdict above is the REGISTERED reading and is left exactly as
+    # declared. Its stated reasoning for the P1-null branch is wrong, and the
+    # correction is recorded rather than folded in - see the declaration's
+    # section 5.1. P1 pools 51 breast lines into 1,127, so a breast-confined
+    # effect would dilute to about 0.005, inside P1's own CI. P1 was therefore
+    # null under BOTH hypotheses and could not separate them.
+    verdict_caveat = paste(
+      "P1 cannot distinguish 'noise at n=51' from 'real but breast-confined';",
+      "see declaration section 5.1. P2 DOES establish the effect is not",
+      "universal (1,076 non-breast lines, zero on both instruments). Whether",
+      "it is real in breast is UNRESOLVED - P3 reuses the same 51 lines and",
+      "fails the two-instrument rule. No claim of breast-specificity is",
+      "licensed. The CCLE expression-matched null is what would settle it.")),
   scores       = list(gsva = GS, mitopps = PPS, lines = lines),
   coverage     = coverage,
   lines        = tibble::tibble(
