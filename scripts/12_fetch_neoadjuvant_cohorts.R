@@ -166,6 +166,33 @@ message("   all ", length(INPUTS), " inputs present and above the size floor")
 # -----------------------------------------------------------------------------
 # Series-matrix helpers
 # -----------------------------------------------------------------------------
+# A GEO series matrix carries enormous metadata LINES - one field per sample,
+# all on one line. Measured in these files:
+#
+#   GSE194040-GPL20078  !Sample_data_processing etc.   896,657 bytes
+#   GSE25066            !Sample_data_processing        185,443 bytes
+#   GSE164458           longest line                   124,861 bytes
+#
+# vroom's connection buffer defaults to 131,072, so GSE25066 stops readr with
+# "The size of the connection buffer was not large enough to fit a complete
+# line" - which reads like a corrupt download and is not one. GSE164458 passes
+# only because it lands 6,211 bytes under the default; that is luck, not
+# margin, so the buffer is raised for every read here rather than for the one
+# file that happened to fail.
+#
+# Raised per call and RESTORED, so sourcing this script leaves no global
+# environment change behind for whatever runs next in the session.
+VROOM_BUF <- 8388608L    # 8 MB, about 9x the largest line seen
+
+.vroom_big <- function(expr) {
+  old <- Sys.getenv("VROOM_CONNECTION_SIZE", unset = NA_character_)
+  Sys.setenv(VROOM_CONNECTION_SIZE = VROOM_BUF)
+  on.exit({
+    if (is.na(old)) Sys.unsetenv("VROOM_CONNECTION_SIZE")
+    else Sys.setenv(VROOM_CONNECTION_SIZE = old)
+  }, add = TRUE)
+  force(expr)
+}
 # A GEO series matrix is a "!"-prefixed metadata block, then
 # !series_matrix_table_begin, the table, then !series_matrix_table_end. The
 # metadata block is read line by line so a 59 MB expression table is never
@@ -235,8 +262,8 @@ message("   all ", length(INPUTS), " inputs present and above the size floor")
 
 .sm_table <- function(path) {
   hdr <- .sm_header(path)
-  readr::read_tsv(path, skip = length(hdr), comment = "!",
-                  show_col_types = FALSE, progress = FALSE)
+  .vroom_big(readr::read_tsv(path, skip = length(hdr), comment = "!",
+                             show_col_types = FALSE, progress = FALSE))
 }
 
 # The join key is DISCOVERED, not assumed, because none of these three cohorts
@@ -330,8 +357,8 @@ message("   all ", length(INPUTS), " inputs present and above the size floor")
     stop(label, ": header has ", length(hdr), " fields and the first data row ",
          n_field, ". Neither a row-named nor a plain layout.", call. = FALSE)
   }
-  out <- readr::read_tsv(path, skip = 1L, col_names = nm,
-                         show_col_types = FALSE, progress = FALSE)
+  out <- .vroom_big(readr::read_tsv(path, skip = 1L, col_names = nm,
+                                    show_col_types = FALSE, progress = FALSE))
   if (ncol(out) != length(nm)) {
     stop(label, ": read ", ncol(out), " columns, expected ", length(nm), ".",
          call. = FALSE)
@@ -511,8 +538,9 @@ if (length(n_skip) != 1L) {
        "markers in the first 200 lines, expected 1. Wrong or truncated file.",
        call. = FALSE)
 }
-gpl <- readr::read_tsv(.local_path("gpl96_annot"), skip = n_skip,
-                       comment = "!", show_col_types = FALSE, progress = FALSE)
+gpl <- .vroom_big(readr::read_tsv(.local_path("gpl96_annot"), skip = n_skip,
+                                  comment = "!", show_col_types = FALSE,
+                                  progress = FALSE))
 stopifnot(all(c("ID", "Gene symbol") %in% names(gpl)))
 message("   GPL96: ", nrow(gpl), " probes annotated")
 if (nrow(gpl) != EXPECT_GPL96_PROBES) {
