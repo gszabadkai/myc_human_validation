@@ -901,6 +901,39 @@ PRIME ~ MYC * OXPHOS * MB2_forkscale + covariates
 PRIME ~ MYC * OXPHOS * MB3_forkscale + covariates    # ER-neutral control axis
 ```
 
+> **RUN 2026-08-30 - Block D is NULL, and F3-pre is INTERMEDIATE.** See
+> `docs/2026-08-30_F3pre_and_block_D_result.md`. n = 885 of the 938 carry forkscale;
+> the fits are n = 844 because `er_call` has 46 NAs. The MB2 three-way is 0.018
+> (p 0.822) on GSVA and 0.015 (p 0.830) on mitoPPS, so **D-a is FALSE** and the
+> matched-null gate correctly stayed shut. None of the 16 pre-registered coefficients
+> clears the two-instrument rule. **D-b, D-c and D-e pass vacuously** - nothing fired -
+> and must not be reported as specificity. MB3 was nevertheless a genuine control axis
+> (Spearman 0.308 against MB1, 0.160 against MB2), so D-c was capable of discriminating.
+>
+> **This closes falsification criterion 1 on its complete stratum list.** Section 2
+> names forkscale as a pre-specified stratum; Block C could not fit it because G3 was
+> not discharged until the following day, so criterion 1 stood MET on an incomplete
+> list until now. Sections 9-10 fix the continuous three-way as the operationalisation,
+> and that is what ran. Still **three of four; only H4 is untested.**
+>
+> The pre-stated power qualifier is unchanged by the result: a three-way with a
+> continuous modifier at n = 844 is underpowered by construction, no direction was
+> pre-specified, and a null here is uninformative. Nothing in Block D resurrects H1.
+>
+> **F3-pre: INTERMEDIATE** - Spearman 0.529 (GSVA) / 0.418 (mitoPPS) against
+> `OXPHOS subunits`, above the 0.30 independence line and below the 0.70 redundancy
+> line on both instruments. Per the G3 note section 4b the verdict is reported and no
+> action is taken on it: **the stop gate does not close**, and section 12's
+> incremental-value requirement stands exactly as written. Do not substitute the
+> script's `delta_r2` companion for this verdict - it fits a linear model on the raw,
+> skew-dominated forkscale (Pearson 0.146 where Spearman is 0.529) and understates
+> badly. Recompute it on the log form before citing it anywhere.
+>
+> **A limitation registered before any H4 outcome data was touched:** forkscale exists
+> for TCGA and METABRIC only. It cannot be adjusted for in the neoadjuvant cohorts, so
+> a positive H4 must argue the fork-redundancy question in text from this rho rather
+> than testing it where the claim is made.
+
 ### Block D2 - developmental analogue via cell of origin -> ED2
 
 ```

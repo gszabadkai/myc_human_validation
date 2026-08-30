@@ -29,32 +29,53 @@ prevent wrong-species errors.
 
 ## Current phase
 
-**All three gates are discharged. Scripts 00–10 are written and run.** Updated
-2026-08-29.
+**All three gates are discharged. Scripts 00–10, 14 and 15 are written and run.**
+Updated 2026-08-30.
 
 | Gate | Outcome | Note |
 |---|---|---|
 | **G1** MYC signature overlap | passed, with D2 | `docs/2026-08-28_G1_result_and_decisions.md` |
 | **G2** MYC/MCL1/BCL2L1 CNV co-occurrence | **passed**; BBC3 fails | `docs/2026-08-28_G2_result.md` |
 | **G3** forkscale availability | **passed**, wider than assumed — TCGA too, not METABRIC-only | `docs/2026-08-29_G3_result_forkscale_availability.md` |
+| **F3-pre** MB1 forkscale redundancy | **INTERMEDIATE** — rho 0.529 / 0.418; the stop gate does not close | `docs/2026-08-30_F3pre_and_block_D_result.md` |
 
 Where the science stands, so that nothing is re-derived by accident:
 
 - **H1 is falsified on both clauses** (Block C and Block B). **H2 and H3 are not
   supported.** The reverse "escape" reading is not supported either. **Three of the four
-  falsification criteria are met; only H4 is untested.**
+  falsification criteria are met; only H4 is untested.** Criterion 1 is now discharged on
+  its **complete** stratum list — Block D added the forkscale stratum, which Block C could
+  not fit because G3 was not yet discharged.
+- **Block G (DepMap) failed at adequate power.** G-a (MCL1) and G-b (BCL2L1) both fail at
+  n = 1,130 with CIs of about ± 0.04. This was the orthogonal functional test, not more
+  observational TCGA correlation.
+- **Block D is null** on both instruments, gate closed, matched null correctly not run.
+  Underpowered by construction (n = 844, continuous modifier); a null there is
+  uninformative and no direction was pre-specified for it.
 - **One finding survives both instruments:** `MYC x OXPHOS` associates with **lower
   BCL-XL and higher BIM**, PUMA unmoved, with no compensating amplification. BIM is
-  pre-specified in the mouse arm (`myc_mouse/scripts/44`), not a fishing result.
+  pre-specified in the mouse arm (`myc_mouse/scripts/44`), not a fishing result. In
+  DepMap it is **UNRESOLVED** — read the section 5.1 correction in the Block G note
+  before touching it. **No claim of breast-specificity is licensed.**
 - Two results were reported and **deliberately not pursued** (`Glycine metabolism`,
   `Folate and 1-C`). Chasing either is the fifth post-hoc hypothesis section 2 forbids.
+  A third joins them: `D MB2 DESCRIPTIVE log2_BCL2L1` (p 0.056, one instrument).
 - **One live commitment:** the BIM replication declared in the Block C note section 9.
-  Honour it or delete it; do not amend it.
+  Honour it or delete it; do not amend it. Block D's descriptive `log2_BCL2L11` rows do
+  **not** discharge it.
 
-Next: script 15 (F3-pre redundancy check + Block D) and script 14 (DepMap / Block G) in
-parallel; then script 11 (freeze STATE); then METABRIC and F3 proper.
+Next: script 11 (freeze `STATE`) — and it must run **before any H4 outcome data is
+touched**. Then the three neoadjuvant cohorts, where H4 and the BIM replication share
+their downloads.
+
+**A limitation registered before the H4 data arrives:** forkscale does not exist for the
+neoadjuvant cohorts and cannot be constructed there. If H4 returns a positive, the
+fork-redundancy question must be argued in text from the TCGA rho of 0.53 — it cannot be
+tested where the claim is made. See the F3-pre note section 7.
 
 Do not build script 13 before F3 returns. **F3 is a stop gate, not a robustness check.**
+F3-pre (exposure side) is discharged; **F3 proper is a survival test, belongs in
+METABRIC, and is still blocked on the METABRIC sample-identifier file.**
 
 ## Workflow — "Option A" (do not deviate)
 
