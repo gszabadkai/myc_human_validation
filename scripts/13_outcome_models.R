@@ -322,15 +322,16 @@ message("\n4. F1 primary")
 
 RES <- list(); .add <- function(x) RES[[length(RES) + 1L]] <<- x
 
-.fit_f1 <- function(d, cn, ox = "OX", label = "F1 primary", extra_cov = NULL) {
+.fit_f1 <- function(d, cn, ox = "OX", buf = "BUFFER_c", label = "F1 primary",
+                    extra_cov = NULL) {
   cv <- c(.covars(d, cn), extra_cov)
-  vars <- c("pcr", "MYC", ox, "BUFFER_c", cv)
+  vars <- c("pcr", "MYC", ox, buf, cv)
   dd <- .frame(d, vars)
-  f <- stats::as.formula(paste("pcr ~ MYC *", ox, "* BUFFER_c",
+  f <- stats::as.formula(paste("pcr ~ MYC *", ox, "*", buf,
                                if (length(cv)) paste("+", paste(cv, collapse = " + "))
                                else ""))
   m <- stats::glm(f, data = dd, family = stats::binomial())
-  list(fit = m, three = paste0("MYC:", ox, ":BUFFER_c"),
+  list(fit = m, three = paste0("MYC:", ox, ":", buf),
        two = paste0("MYC:", ox), label = label, cohort = cn)
 }
 
@@ -343,6 +344,57 @@ for (cn in COHORTS) {
   .add(.tidy(zi$fit, zi$three, "F1 three-way", cn, list(scoring = "int3")))
   .add(.tidy(zi$fit, zi$two,   "F1 two-way",   cn, list(scoring = "int3")))
 }
+
+# =============================================================================
+# 4b. The per-gene companion - MANDATORY, not optional
+# =============================================================================
+# Declaration section 6.3: "The two genes are additionally reported separately,
+# each in its own three-way, alongside the composite. Not as an alternative to
+# select between after the fact - as the same 'report the components' discipline
+# script 10 applies to buffer_MCL1 and buffer_BCL2L1. If the composite fires and
+# neither component does, that is reported."
+#
+# This section was MISSING from the first version of this script and was added
+# after the first run. It changes no declared direction and adds no hypothesis;
+# it supplies a companion the declaration already required. The composite's
+# result is unchanged by its presence.
+#
+# It matters more here than it would have looked in advance: MCL1 and BCL2L1
+# expression turn out to be nearly UNCORRELATED in these cohorts (section 4c),
+# so BUFFER_c averages two variables carrying different information rather than
+# two readings of one latent buffering capacity. A composite built that way can
+# behave unlike either of its parts, and the only way to see that is to fit them.
+#
+# Per-cohort scoring only. The int3 variant exists to test sensitivity to the
+# OXPHOS SET's composition (A2); the buffer limbs are single genes and have no
+# set composition to be sensitive to.
+message("\n4b. per-gene buffer companion (declaration section 6.3)")
+
+for (cn in COHORTS) {
+  for (g in c("z_MCL1", "z_BCL2L1")) {
+    zz <- .fit_f1(D[[cn]], cn, buf = g)
+    .add(.tidy(zz$fit, zz$three, paste("F1 three-way", sub("^z_", "", g)), cn,
+               list(scoring = "per-cohort")))
+  }
+}
+
+# =============================================================================
+# 4c. Are the two limbs the same variable?
+# =============================================================================
+# BUFFER_c was specified as the MEAN of the two z-scores rather than their
+# maximum, on the stated grounds that two anti-apoptotic proteins both being
+# high is more buffering than one being high (declaration 6.2). That argument
+# assumes the limbs are related. Measured, not assumed.
+message("\n4c. buffer limbs")
+
+limbs <- dplyr::bind_rows(lapply(COHORTS, function(cn) {
+  d <- D[[cn]]
+  tibble::tibble(cohort = cn,
+                 rho_MCL1_BCL2L1 = stats::cor(d$z_MCL1, d$z_BCL2L1,
+                                              method = "spearman"),
+                 r_MCL1_BCL2L1 = stats::cor(d$z_MCL1, d$z_BCL2L1))
+}))
+limbs %>% as.data.frame() %>% print(row.names = FALSE)
 
 coefs <- dplyr::bind_rows(RES)
 coefs %>% dplyr::filter(label == "F1 three-way") %>%
@@ -398,6 +450,19 @@ meta <- dplyr::bind_rows(lapply(
   split(coefs, list(coefs$label, coefs$scoring), drop = TRUE),
   function(g) .meta(g$estimate, g$se, g$label[1], g$scoring[1])))
 meta %>% as.data.frame() %>% print(row.names = FALSE)
+
+# The composite and its two limbs, side by side. Section 6.3's reporting
+# requirement is that this comparison is VISIBLE, not that it passes anything.
+message("\n   composite vs its limbs, per cohort (three-way, per-cohort scoring):")
+# Long form deliberately: pivoting on `label` makes column names with spaces
+# that print mangled, and this table is read by eye.
+coefs %>%
+  dplyr::filter(scoring == "per-cohort",
+                label %in% c("F1 three-way", "F1 three-way MCL1",
+                             "F1 three-way BCL2L1")) %>%
+  dplyr::arrange(cohort, label) %>%
+  dplyr::select(cohort, label, n, estimate, ci_lo, ci_hi, p) %>%
+  as.data.frame() %>% print(row.names = FALSE)
 
 # =============================================================================
 # 6. Specificity - I-SPY2 and BrighTNess only (A2)
@@ -580,7 +645,21 @@ declared <- tibble::tribble(
 
   "F1-g  INFORMATIVE FAILURE (plan section 2, criterion 4)",
   "OXPHOS slope at MYC=+1SD NEGATIVE, CI excl 0, WHILE three-way null",
-  isTRUE(sl$ci_hi < 0) && isTRUE(three_null))
+  isTRUE(sl$ci_hi < 0) && isTRUE(three_null),
+
+  # 6.3 is a REPORTING requirement, not a prediction. TRUE here means only
+  # "the composite is not doing something neither of its limbs does" - it is a
+  # coherence check on the construct, and it carries no support for H4.
+  "F1-h  composite coheres with its limbs (6.3, reporting)",
+  "not: composite fires while BOTH limbs are null",
+  {
+    fired <- function(lab) {
+      r <- meta[meta$label == lab & meta$scoring == "per-cohort", ]
+      nrow(r) == 1L && (r$fe_ci_hi < 0 || r$fe_ci_lo > 0)
+    }
+    !(fired("F1 three-way") &&
+        !fired("F1 three-way MCL1") && !fired("F1 three-way BCL2L1"))
+  })
 declared %>% as.data.frame() %>% print(row.names = FALSE)
 
 message("\n   REMINDER: H4 is SINGLE-INSTRUMENT (A1). GSVA only; mitoPPS does")
@@ -598,7 +677,7 @@ out <- list(
   coefficients = coefs, meta = meta, specificity = spec,
   secondary = sec, meta_secondary = meta_sec,
   treatment_descriptive = trt, slopes = slopes,
-  coverage = coverage, declared = declared,
+  coverage = coverage, declared = declared, buffer_limbs = limbs,
   scores = lapply(SC, `[[`, "scores"),
   frames = D, frames_int3 = Di,
   spec_cohorts = spec_ok,
@@ -609,6 +688,10 @@ out <- list(
     covariates = paste("A4: subtype + treatment only. Stage and grade do not",
                        "exist in the primary cohort."),
     buffer     = "mean(z(log2 MCL1), z(log2 BCL2L1)) within cohort (6.1)",
+    buffer_limbs = paste("6.3: both genes additionally fitted separately, each",
+                         "in its own three-way. Added after the first run; a",
+                         "companion the declaration already required, changing",
+                         "no direction and adding no hypothesis."),
     directions = paste("three-way NEGATIVE, two-way POSITIVE, fixed 2026-08-30",
                        "section 6.5 before any of this existed"),
     scoring    = paste("one GSVA run per cohort, pinned universe; scores never",
