@@ -15,6 +15,11 @@ decides:
     sensitivity. GSE25066 is excluded from the SPECIFICITY battery only.
   - C3. The score x treatment contrast against I-SPY2's control arm is
     estimable only within HRpos_HER2neg and TNBC.
+  - A4. The F1 covariate set is subtype + treatment. Stage and grade DO NOT
+    EXIST in the primary cohort; the plan's F1 model cannot be fitted as
+    written. Cohort-specific covariates are a sensitivity only.
+  - A5. Missing values: drop genes above 5% NA, impute the rest at the gene
+    median within cohort. Declared before any score was computed.
 next-action: script 13. Once it computes the first score-versus-pCR
   association, NOTHING in this note or in the 2026-08-30 declaration may be
   amended again.
@@ -209,6 +214,86 @@ Where the randomised treatment evidence therefore comes from:
 D5 preferred I-SPY2 over GSE25066 partly because it "can test `score x
 treatment`". That remains true and is now bounded: it tests it in two of four
 receptor subtypes.
+
+---
+
+## 3b. AMENDMENT A4 - the F1 covariate set, which the plan's model cannot have
+
+**Added 2026-08-31 while writing script 13, before it was run.** Still
+exposure-side: this is metadata availability, not a result.
+
+### The fact
+
+Plan Block F1 specifies
+
+```
+pCR ~ MYC * OXPHOS * BUFFER + stage + grade + ER_status + arm
+```
+
+**Stage and grade do not exist in the primary cohort.** GSE194040's deposited
+phenotype is `patient id, tissue, hr, her2, mp, pcr, arm` and nothing else - no
+stage, no grade, no age, no nodal status. What each cohort actually carries:
+
+| | subtype | treatment | stage | grade | nodal | age |
+|---|---|---|---|---|---|---|
+| GSE194040 | yes (hr/her2) | yes, 14 arms | **no** | **no** | **no** | **no** |
+| GSE164458 | constant TNBC | yes, 3 arms | **no** | **no** | yes | **no** |
+| GSE25066 | yes (IHC) | constant | yes | yes | yes | yes |
+
+The only covariate available in all three is **subtype**, and it is constant in
+GSE164458 by design.
+
+### The amendment
+
+> **Primary, harmonised across all three:**
+> `pCR ~ MYC * OXPHOS * BUFFER_c + subtype + treatment`, logistic. A term that
+> is constant within a cohort is dropped from that cohort's fit and the drop is
+> reported.
+>
+> **Cohort-specific sensitivity:** each cohort's model additionally adjusted for
+> what that cohort has - nodal and ECOG in GSE164458, stage/grade/age in
+> GSE25066. Reported alongside, never instead.
+>
+> The meta-analysis pools the **harmonised** estimates, because pooling
+> estimates from differently-adjusted models is not a meta-analysis.
+
+`mp` is deliberately NOT used in GSE194040. D5 section 4 flagged it as probably
+MP1-vs-MP2 within I-SPY2's high-risk criterion and said "confirm before use".
+It has not been confirmed, so it stays out of the primary and is reported only
+as an unconfirmed sensitivity.
+
+**What this costs:** residual confounding by stage and grade in the primary
+cohort cannot be excluded, and neither can it be quantified there. Subtype
+absorbs part of it - `subtype` is the strongest single predictor of pCR in
+these cohorts - but not all. State it as a limitation; do not imply the
+plan's covariate set was fitted.
+
+## 3c. AMENDMENT A5 - missing values, declared before scoring
+
+### The fact
+
+GSE194040 carries 2,835 NA values: 1,141 of 19,134 genes and 478 of 988
+samples are touched, but only **one gene** exceeds 5% missing and the worst gene
+is 6.3%. The other two cohorts have none.
+
+The damage is concentrated where it matters: **12 of the 69 OXPHOS-subunit genes
+present in I-SPY2 carry at least one NA**, and 7 of 57 assembly factors. So
+"drop any gene with any NA" would cut I-SPY2's OXPHOS coverage from 69 to 57 -
+down to GSE25066's level - to remove 2,835 values out of 18.9 million.
+
+### The amendment
+
+> 1. Drop any gene with **more than 5% NA** across that cohort's samples
+>    (removes one gene in GSE194040, none elsewhere).
+> 2. Impute the remaining NAs with **that gene's median across samples**, within
+>    cohort.
+> 3. Report the number of values imputed per cohort.
+
+Gene-median imputation is the neutral choice for a rank-based score: GSVA
+estimates each gene's distribution across samples and then walks a per-sample
+rank, so an imputed sample sits at that gene's central rank contribution rather
+than being pushed to either tail. It is not a claim about the missing values;
+it is the choice that moves the score least.
 
 ---
 
