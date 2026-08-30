@@ -298,6 +298,47 @@ message("   all ", length(INPUTS), " inputs present and above the size floor")
 
 # A matrix is accepted as log2 only if it looks like one. This is a guard, not a
 # transformation: nothing here rescales anything.
+# A file written by R with row.names = TRUE has ONE FEWER header field than it
+# has data fields, and readr does not treat that as row names: it reads 988
+# names against 989 fields and MERGES THE OVERFLOW INTO THE LAST COLUMN, so the
+# final sample silently becomes the character string "8.427\t8.8056" - two
+# patients' values glued together - while every other column parses cleanly.
+# read_tsv warns, but the warning says "parsing issues", not "your last sample
+# is now two samples".
+#
+# So the header is read separately and the body is given explicit names. The
+# ragged case is detected rather than guessed at: if the header is one short,
+# the first data field is row names.
+.read_matrix_tsv <- function(path, label) {
+  con <- gzfile(path, "rt")
+  hdr <- strsplit(readLines(con, n = 1L, warn = FALSE), "\t", fixed = TRUE)[[1]]
+  close(con)
+  hdr <- gsub('^"|"$', "", hdr)
+
+  con <- gzfile(path, "rt")
+  n_field <- length(strsplit(readLines(con, n = 2L, warn = FALSE)[2], "\t",
+                             fixed = TRUE)[[1]])
+  close(con)
+
+  if (n_field == length(hdr) + 1L) {
+    message("     row-named layout: ", length(hdr), " header fields, ",
+            n_field, " data fields")
+    nm <- c("gene", hdr)
+  } else if (n_field == length(hdr)) {
+    nm <- c("gene", hdr[-1])
+  } else {
+    stop(label, ": header has ", length(hdr), " fields and the first data row ",
+         n_field, ". Neither a row-named nor a plain layout.", call. = FALSE)
+  }
+  out <- readr::read_tsv(path, skip = 1L, col_names = nm,
+                         show_col_types = FALSE, progress = FALSE)
+  if (ncol(out) != length(nm)) {
+    stop(label, ": read ", ncol(out), " columns, expected ", length(nm), ".",
+         call. = FALSE)
+  }
+  out
+}
+
 # as.matrix() on a data frame containing one stray character column silently
 # returns a CHARACTER matrix, and storage.mode(x) <- "double" then fills it with
 # NAs behind a warning. Checked rather than hoped for.
@@ -340,11 +381,7 @@ RES_SCALE <- list()
 # of the source, not a choice made here, and it must be stated in Methods.
 message("\n2. GSE194040 - I-SPY2-990 (primary)")
 
-ispy2_e <- readr::read_tsv(.local_path("ispy2_expr"), show_col_types = FALSE,
-                           progress = FALSE)
-# The file is written with row names and a header shifted by one, so the first
-# column arrives unnamed and carries the gene symbols.
-names(ispy2_e)[1] <- "gene"
+ispy2_e <- .read_matrix_tsv(.local_path("ispy2_expr"), "GSE194040")
 ispy2_m <- .numeric_matrix(ispy2_e, "gene", "GSE194040")
 message("   expression: ", nrow(ispy2_m), " genes x ", ncol(ispy2_m), " samples")
 if (ncol(ispy2_m) != EXPECT_ISPY2_N) {
@@ -394,9 +431,7 @@ RES_SCALE[["GSE194040"]] <- .assert_log2(ispy2_m, "GSE194040")
 # =============================================================================
 message("\n3. GSE164458 - BrighTNess (replication)")
 
-bt_e <- readr::read_tsv(.local_path("brightness_expr"), show_col_types = FALSE,
-                        progress = FALSE)
-names(bt_e)[1] <- "gene"
+bt_e <- .read_matrix_tsv(.local_path("brightness_expr"), "GSE164458")
 bt_m <- .numeric_matrix(bt_e, "gene", "GSE164458")
 message("   expression: ", nrow(bt_m), " genes x ", ncol(bt_m), " samples")
 
