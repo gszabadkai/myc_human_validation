@@ -29,81 +29,45 @@ prevent wrong-species errors.
 
 ## Current phase
 
-**All three gates are discharged. Scripts 00–11, 14 and 15 are written and run.
-`STATE` is frozen.** Updated 2026-08-30.
+**Scripts 00–15 are all written and run. All four hypotheses are tested and none
+is supported.** Updated 2026-08-31.
 
 | Gate | Outcome | Note |
 |---|---|---|
 | **G1** MYC signature overlap | passed, with D2 | `docs/2026-08-28_G1_result_and_decisions.md` |
 | **G2** MYC/MCL1/BCL2L1 CNV co-occurrence | **passed**; BBC3 fails | `docs/2026-08-28_G2_result.md` |
-| **G3** forkscale availability | **passed**, wider than assumed — TCGA too, not METABRIC-only | `docs/2026-08-29_G3_result_forkscale_availability.md` |
+| **G3** forkscale availability | **passed**, TCGA too, not METABRIC-only | `docs/2026-08-29_G3_result_forkscale_availability.md` |
 | **F3-pre** MB1 forkscale redundancy | **INTERMEDIATE** — rho 0.529 / 0.418; the stop gate does not close | `docs/2026-08-30_F3pre_and_block_D_result.md` |
 
 Where the science stands, so that nothing is re-derived by accident:
 
 - **H1 is falsified on both clauses** (Block C and Block B). **H2 and H3 are not
-  supported.** The reverse "escape" reading is not supported either. **Three of the four
-  falsification criteria are met; only H4 is untested.** Criterion 1 is now discharged on
-  its **complete** stratum list — Block D added the forkscale stratum, which Block C could
-  not fit because G3 was not yet discharged.
-- **Block G (DepMap) failed at adequate power.** G-a (MCL1) and G-b (BCL2L1) both fail at
-  n = 1,130 with CIs of about ± 0.04. This was the orthogonal functional test, not more
-  observational TCGA correlation.
-- **Block D is null** on both instruments, gate closed, matched null correctly not run.
-  Underpowered by construction (n = 844, continuous modifier); a null there is
-  uninformative and no direction was pre-specified for it.
-- **One finding survives both instruments:** `MYC x OXPHOS` associates with **lower
-  BCL-XL and higher BIM**, PUMA unmoved, with no compensating amplification. BIM is
+  supported.** The escape reading is not supported and its reversal is not
+  mitochondrial. **Block G failed at adequate power** (n = 1,130, CIs about ± 0.04).
+  **Block D is null.** **H4 is not supported** — every substantive declared reading
+  fails, and it fails as a null rather than in the informative direction.
+- **Three of four falsification criteria are met.** The fourth is unmet only because
+  criterion 4 demands an active *inversion*, which is a stronger claim than a null.
+- **One finding survives, in TCGA, on both instruments:** `MYC x OXPHOS` associates with
+  **lower BCL-XL and higher BIM**, PUMA unmoved, no compensating amplification. BIM is
   pre-specified in the mouse arm (`myc_mouse/scripts/44`), not a fishing result. In
-  DepMap it is **UNRESOLVED** — read the section 5.1 correction in the Block G note
-  before touching it. **No claim of breast-specificity is licensed.**
-- Two results were reported and **deliberately not pursued** (`Glycine metabolism`,
-  `Folate and 1-C`). Chasing either is the fifth post-hoc hypothesis section 2 forbids.
-  A third joins them: `D MB2 DESCRIPTIVE log2_BCL2L1` (p 0.056, one instrument).
-- **One live commitment:** the BIM replication declared in the Block C note section 9.
-  Honour it or delete it; do not amend it. Block D's descriptive `log2_BCL2L11` rows do
-  **not** discharge it.
+  DepMap it is **UNRESOLVED** — read the Block G note section 5.1 before touching it.
+  **No claim of breast-specificity is licensed.**
+- **Four results reported and deliberately NOT pursued:** `Glycine metabolism` (Block C),
+  `Folate and 1-C` (Block B), `D MB2 DESCRIPTIVE log2_BCL2L1` (Block D), and **MCL1 in
+  BrighTNess** (F1 — one gene, one cohort, I² 82%, Q p 0.0036). Chasing any of them is
+  the fifth post-hoc hypothesis section 2 forbids.
+- **One live commitment, and it is BLOCKED:** the BIM replication declared in the Block C
+  note section 9 requires **both** instruments. mitoPPS does not exist in the three
+  neoadjuvant cohorts (amendment A1), so it cannot be run there as declared. See
+  `docs/2026-08-31_block_F1_result_H4_not_supported.md` section 9 — the options are
+  SCAN-B, deletion, or an explicitly-labelled non-replication.
 
-**All three H4 cohorts are fetched, parsed and harmonised** (script 12, run 2026-08-31;
-`results/neoadjuvant_cohorts.rds`). n = 988 / 482 / 508, with 319 / 236 / 99 pCR.
+Next: the decision on the arm as a whole, and the BIM commitment. Plan section 15's
+well-formed-failure framing is now fully available and is what the evidence supports.
 
-Next: script 13. **Once it computes the first score-versus-pCR association, nothing in
-the 2026-08-30 declaration or the 2026-08-31 amendment may be revised.** Three things
-were settled first, all pre-data and all forced by the platforms rather than by a
-result — `docs/2026-08-31_H4_amendment_instruments_and_coverage.md`:
-
-- **H4 is GSVA-only.** mitoPPS does not exist in any of the three cohorts (all log2, no
-  linear count matrix). A positive H4 is **single-instrument** and does not meet the bar
-  Blocks B, C and G were held to. Bolting on ssGSEA would not restore two instruments.
-- **Each cohort is scored on the genes it has**, coverage reported beside every estimate,
-  with the 3-cohort intersection as a pre-specified sensitivity. **GSE25066 is excluded
-  from the specificity battery** — its assembly-factor control is 34/68.
-- **The `score x treatment` contrast against I-SPY2's control arm reaches only
-  HRpos_HER2neg and TNBC** — the 179-patient control arm has zero HER2+ patients.
-
-**`STATE` is frozen** (script 11, `results/state_definition.rds`) with the definition
-unamended, as a portable constructor script 13 must **call** rather than re-implement.
-Two findings from the freeze that constrain H4 and belong in the text:
-
-- **H4's BUFFER is an expression construct, not the copy-number BUFFER that G2 passed
-  on and Blocks B and G failed to support** — the tertile fallback agrees with the
-  GISTIC rule at only kappa 0.221. Kept, not tuned. A null H4 does not re-test Block B
-  or G, and a positive H4 would not rescue them.
-- **The level-3-vs-4 contrast is subtype-confounded against its own prediction.** PAM50
-  adjustment is mandatory, and a positive in the predicted direction is conservative.
-
-The continuous `BUFFER_c` that D5's primary H4 test requires is declared pre-data in
-`docs/2026-08-30_STATE_frozen_and_H4_buffer_declaration.md` section 6, with
-`MYC:OXPHOS:BUFFER_c` predicted **negative**.
-
-**A limitation registered before the H4 data arrives:** forkscale does not exist for the
-neoadjuvant cohorts and cannot be constructed there. If H4 returns a positive, the
-fork-redundancy question must be argued in text from the TCGA rho of 0.53 — it cannot be
-tested where the claim is made. See the F3-pre note section 7.
-
-Do not build script 13 before F3 returns. **F3 is a stop gate, not a robustness check.**
-F3-pre (exposure side) is discharged; **F3 proper is a survival test, belongs in
-METABRIC, and is still blocked on the METABRIC sample-identifier file.**
+Do not build script 16/17/18 before that decision. **The two-way is not a fallback**
+(plan Block F1), and no fifth hypothesis is permitted.
 
 ## Workflow — "Option A" (do not deviate)
 
