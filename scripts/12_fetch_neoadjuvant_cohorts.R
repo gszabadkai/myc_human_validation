@@ -448,6 +448,38 @@ stopifnot(nrow(ispy2_p) == EXPECT_ISPY2_N)
 ispy2_key <- .match_ids(colnames(ispy2_m), ispy2_p, "GSE194040")
 ispy2_p <- .align_pheno(ispy2_p, colnames(ispy2_m), ispy2_key, "GSE194040")
 
+# I-SPY2's `arm` field carries ONE typo, and it matters more than a typo should:
+# "Paclitaxel + AMG 386" (n = 114) and "Paclitaxel + AMG-386" (n = 1) are the
+# same arm spelled two ways. Left alone that is a singleton factor level, which
+# either drops a patient or makes any arm-adjusted design rank-deficient - and
+# it would be found, if at all, as a confusing model error rather than as a
+# spelling difference.
+#
+# Normalised explicitly rather than by a silent gsub, and the merge is printed,
+# because collapsing two treatment labels is a data decision and not a format
+# fix. Only separator variants are merged; nothing else is touched.
+# A blanket hyphen-to-space rule would be WRONG here: it turns "T-DM1 +
+# Pertuzumab" into "T DM1 + Pertuzumab", and that hyphen is part of the drug's
+# name. So only labels that genuinely COLLIDE once punctuation and case are
+# ignored get merged, and the more common spelling wins. A label with no
+# collision partner is never touched.
+.norm_arm <- function(x) {
+  key <- gsub("[^a-z0-9]+", "", tolower(x))
+  tab <- table(x)
+  out <- x
+  for (k in unique(key)) {
+    lv <- unique(x[key == k])
+    if (length(lv) < 2L) next
+    keep <- lv[which.max(tab[lv])]
+    for (l in setdiff(lv, keep)) {
+      message("   arm label merged: '", l, "' (n = ", tab[[l]], ") -> '",
+              keep, "' (n = ", tab[[keep]], ")")
+      out[x == l] <- keep
+    }
+  }
+  out
+}
+
 # Endpoint: `pcr` is already 0/1 in this series.
 ispy2_p <- ispy2_p %>%
   dplyr::mutate(
@@ -460,7 +492,7 @@ ispy2_p <- ispy2_p %>%
       hr == 0 & her2 == 0     ~ "TNBC",
       hr == 1 & her2 == 1     ~ "HRpos_HER2pos",
       hr == 0 & her2 == 1     ~ "HRneg_HER2pos"),
-    treatment = trimws(as.character(.data$arm)))
+    treatment = .norm_arm(trimws(as.character(.data$arm))))
 
 message("   pCR: ", sum(ispy2_p$pcr, na.rm = TRUE), " of ",
         sum(!is.na(ispy2_p$pcr)),
@@ -759,6 +791,12 @@ out <- list(
     forbidden      = HATZIS_FORBIDDEN,
     no_association = paste("no score-versus-pCR association is computed in this",
                            "script; marginals only (D5 section 2)"),
+    arm_labels     = paste("I-SPY2 'AMG-386' merged into 'AMG 386' (n = 1 vs",
+                           "114); separator variants only"),
+    control_arm    = paste("I-SPY2's 179-patient Paclitaxel control arm is 94",
+                           "HRpos_HER2neg + 85 TNBC and contains ZERO HER2+",
+                           "patients, so a score x treatment contrast against",
+                           "control is only estimable in those two strata"),
     mitopps        = paste("NOT available: no linear DESeq2-normalised matrix",
                            "exists in any of the three. Needs a recorded",
                            "amendment on feasibility grounds before script 13.")),
