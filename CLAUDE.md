@@ -29,8 +29,8 @@ prevent wrong-species errors.
 
 ## Current phase
 
-**All three gates are discharged. Scripts 00–10, 14 and 15 are written and run.**
-Updated 2026-08-30.
+**All three gates are discharged. Scripts 00–11, 14 and 15 are written and run.
+`STATE` is frozen.** Updated 2026-08-30.
 
 | Gate | Outcome | Note |
 |---|---|---|
@@ -64,9 +64,24 @@ Where the science stands, so that nothing is re-derived by accident:
   Honour it or delete it; do not amend it. Block D's descriptive `log2_BCL2L11` rows do
   **not** discharge it.
 
-Next: script 11 (freeze `STATE`) — and it must run **before any H4 outcome data is
-touched**. Then the three neoadjuvant cohorts, where H4 and the BIM replication share
-their downloads.
+Next: script 12 — fetch GSE194040, GSE164458, GSE25066, where H4 and the BIM
+replication share their downloads. **Nothing in the H4 declaration may be revised once
+any of those outcome columns has been read.**
+
+**`STATE` is frozen** (script 11, `results/state_definition.rds`) with the definition
+unamended, as a portable constructor script 13 must **call** rather than re-implement.
+Two findings from the freeze that constrain H4 and belong in the text:
+
+- **H4's BUFFER is an expression construct, not the copy-number BUFFER that G2 passed
+  on and Blocks B and G failed to support** — the tertile fallback agrees with the
+  GISTIC rule at only kappa 0.221. Kept, not tuned. A null H4 does not re-test Block B
+  or G, and a positive H4 would not rescue them.
+- **The level-3-vs-4 contrast is subtype-confounded against its own prediction.** PAM50
+  adjustment is mandatory, and a positive in the predicted direction is conservative.
+
+The continuous `BUFFER_c` that D5's primary H4 test requires is declared pre-data in
+`docs/2026-08-30_STATE_frozen_and_H4_buffer_declaration.md` section 6, with
+`MYC:OXPHOS:BUFFER_c` predicted **negative**.
 
 **A limitation registered before the H4 data arrives:** forkscale does not exist for the
 neoadjuvant cohorts and cannot be constructed there. If H4 returns a positive, the

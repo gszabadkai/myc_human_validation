@@ -661,6 +661,40 @@ Secondary H4 contrast: **level 3 vs level 4**. That single contrast is the whole
 prediction and it is one degree of freedom. It is reported alongside the continuous
 primary, never instead of it, and never selected between after the fact.
 
+> **FROZEN 2026-08-30 (script 11).** See
+> `docs/2026-08-30_STATE_frozen_and_H4_buffer_declaration.md`. The definition above is
+> transcribed without amendment into a portable constructor in
+> `results/state_definition.rds`, which script 13 must CALL rather than re-implement.
+> The constructor closes over nothing (`environment()` is `baseenv()`, asserted) and
+> offers no argument for an external cut, so a TCGA threshold cannot reach another
+> cohort. The level-3-vs-4 contrast is kept exactly as written, direction included.
+>
+> **Seven choices this section left open are resolved in that note section 1.1** and
+> saved in `frozen$spec`: both instruments; M-a; `OXPHOS subunits`; medians within
+> cohort at scoring time; `> median` is high; BUFFER without CNV is the top tertile of
+> MCL1 OR of BCL2L1 (BCL2 excluded per section 9); complete cases.
+>
+> **The expression-tertile fallback is weakly concordant with the GISTIC rule it
+> substitutes for: kappa = 0.221, concordance 61.7%, specificity 52.3% at n = 938.**
+> Mechanically expected - BUFFER is dominated by a broad 20q gain (`buffer_BCL2L1` 439)
+> rather than focal amplification (158), and an arm-level gain moves one gene's
+> expression weakly. **KEPT, not tuned**, for the three reasons in that note section
+> 3.3. Consequence, which belongs in the manuscript: **H4's BUFFER is an EXPRESSION
+> construct and is not the copy-number BUFFER that G2 passed on and that Blocks B and G
+> failed to support.** A null H4 does not re-test them and a positive H4 would not
+> rescue them.
+>
+> **The secondary contrast is subtype-confounded against its own prediction.** Level 4
+> (predicted resistant) is basal-enriched and 41.2% ER-negative against level 3's 27.9%,
+> and basal tumours have markedly higher pCR. So PAM50 adjustment is mandatory, and a
+> positive in the predicted direction would be conservative.
+>
+> **The CONTINUOUS BUFFER that D5's primary test requires was never defined here.** It
+> is declared, pre-data, in that note section 6:
+> `BUFFER_c = mean(z(log2 MCL1), z(log2 BCL2L1))`, within cohort, with the two genes
+> also reported separately, and with `MYC:OXPHOS:BUFFER_c` **predicted NEGATIVE**. That
+> declaration adds a quantity the plan requires; it does not revise this freeze.
+
 ---
 
 ## 8. Covariates and their sources
