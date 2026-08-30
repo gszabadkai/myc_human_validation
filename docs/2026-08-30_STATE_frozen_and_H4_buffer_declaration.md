@@ -286,6 +286,25 @@ with MYC = M-a, OXPHOS = `OXPHOS subunits`, both z-scored within cohort, on
 **Claim only what both instruments support**, as everywhere else in this arm.
 Report confidence intervals, not p-values alone (D5 section 6.3).
 
+> **AMENDED 2026-08-31 - H4 IS GSVA-ONLY.** See
+> `docs/2026-08-31_H4_amendment_instruments_and_coverage.md` section 1. Script 12
+> established that all three neoadjuvant cohorts are deposited on the log2 scale
+> and that **no linear DESeq2-normalised matrix exists for any of them** - two are
+> microarrays and the third is deposited already logged - so mitoPPS is not
+> computable. Exponentiating recovers a linear scale but not the quantity mitoPPS
+> is defined on.
+>
+> The two-instrument clause above is **suspended for H4 only**, on FEASIBILITY
+> grounds, before any score-versus-pCR association existed. It remains in force
+> everywhere else in the arm.
+>
+> **The cost, which is not absorbed:** H4's evidential standard is now weaker than
+> Blocks B, C and G, each of which required agreement between two instruments that
+> can and do disagree. A positive H4 must be reported as **single-instrument** and
+> must not be written as though it met the Block C bar. Adding ssGSEA or a mean-z
+> on the same log matrix does NOT restore two instruments - see that note section
+> 1's final paragraph.
+
 ### 6.6 The informative failure, in coefficient terms
 
 Plan section 2's fourth falsification criterion is "H4 fails in the informative

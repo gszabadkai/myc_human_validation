@@ -64,9 +64,22 @@ Where the science stands, so that nothing is re-derived by accident:
   Honour it or delete it; do not amend it. Block D's descriptive `log2_BCL2L11` rows do
   **not** discharge it.
 
-Next: script 12 — fetch GSE194040, GSE164458, GSE25066, where H4 and the BIM
-replication share their downloads. **Nothing in the H4 declaration may be revised once
-any of those outcome columns has been read.**
+**All three H4 cohorts are fetched, parsed and harmonised** (script 12, run 2026-08-31;
+`results/neoadjuvant_cohorts.rds`). n = 988 / 482 / 508, with 319 / 236 / 99 pCR.
+
+Next: script 13. **Once it computes the first score-versus-pCR association, nothing in
+the 2026-08-30 declaration or the 2026-08-31 amendment may be revised.** Three things
+were settled first, all pre-data and all forced by the platforms rather than by a
+result — `docs/2026-08-31_H4_amendment_instruments_and_coverage.md`:
+
+- **H4 is GSVA-only.** mitoPPS does not exist in any of the three cohorts (all log2, no
+  linear count matrix). A positive H4 is **single-instrument** and does not meet the bar
+  Blocks B, C and G were held to. Bolting on ssGSEA would not restore two instruments.
+- **Each cohort is scored on the genes it has**, coverage reported beside every estimate,
+  with the 3-cohort intersection as a pre-specified sensitivity. **GSE25066 is excluded
+  from the specificity battery** — its assembly-factor control is 34/68.
+- **The `score x treatment` contrast against I-SPY2's control arm reaches only
+  HRpos_HER2neg and TNBC** — the 179-patient control arm has zero HER2+ patients.
 
 **`STATE` is frozen** (script 11, `results/state_definition.rds`) with the definition
 unamended, as a portable constructor script 13 must **call** rather than re-implement.
