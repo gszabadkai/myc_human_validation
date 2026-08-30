@@ -223,28 +223,51 @@ VROOM_BUF <- 8388608L    # 8 MB, about 9x the largest line seen
   })
 }
 
-# Characteristic lines are one FIELD per line, one value per sample, written as
-# "key: value". The key is taken as the most common prefix on the line rather
-# than from the first sample, because GEO permits ragged keys.
-.sm_characteristics <- function(hdr) {
+# Characteristic lines are "key: value", one value per sample. THEY ARE NOT
+# ALIGNED ACROSS SAMPLES, and assuming they are corrupts the endpoint.
+#
+# Measured in GSE25066: the series is ragged from the 7th characteristic line
+# onward, because its 310- and 198-sample blocks were deposited with different
+# field orders. Line 12 carries `pathologic_response_pcr_rd` for 310 samples and
+# `pathologic_response_rcb_class` for the other 198. A parser that names the
+# line by its majority key - which this one used to do - hands back RCB classes
+# labelled as pCR for 198 of 508 patients. Nothing about that is visible
+# downstream; it simply changes who is a responder.
+#
+# So the key is read PER SAMPLE and the table is pivoted on it. A sample that
+# never carried a given key gets NA for it, which is the truth.
+.sm_characteristics <- function(hdr, n_samples) {
   ch <- .sm_field(hdr, "!Sample_characteristics_ch1")
-  if (is.null(ch)) return(tibble::tibble())
-  cols <- lapply(ch, function(v) {
-    k <- sub(":.*$", "", v)
-    key <- names(sort(table(k[nzchar(k)]), decreasing = TRUE))[1]
-    val <- trimws(sub("^[^:]*:\\s*", "", v))
-    val[!nzchar(trimws(v))] <- NA_character_
-    list(key = key, val = val)
-  })
-  out <- tibble::as_tibble(stats::setNames(
-    lapply(cols, `[[`, "val"),
-    make.unique(vapply(cols, `[[`, character(1), "key"))))
-  out
+  if (is.null(ch)) return(tibble::tibble(.rows = n_samples))
+
+  long <- dplyr::bind_rows(lapply(ch, function(v) {
+    kv <- grepl(":", v, fixed = TRUE)
+    tibble::tibble(
+      sample = seq_along(v),
+      key    = ifelse(kv, trimws(sub(":.*$", "", v)), NA_character_),
+      value  = ifelse(kv, trimws(sub("^[^:]*:[ ]?", "", v)), NA_character_))
+  }))
+  long <- long[!is.na(long$key) & nzchar(long$key), , drop = FALSE]
+  long$value[long$value %in% c("", "NA", "na", "N/A", "n/a", "null")] <-
+    NA_character_
+
+  # A sample may legitimately carry the same key twice; number the repeats
+  # rather than letting pivot_wider silently make a list column.
+  long <- long %>%
+    dplyr::group_by(.data$sample, .data$key) %>%
+    dplyr::mutate(key = if (dplyr::n() > 1L)
+                          paste0(.data$key, "_", dplyr::row_number())
+                        else .data$key) %>%
+    dplyr::ungroup()
+
+  wide <- tidyr::pivot_wider(long, names_from = "key", values_from = "value")
+  out <- dplyr::left_join(tibble::tibble(sample = seq_len(n_samples)), wide,
+                          by = "sample")
+  dplyr::select(out, -"sample")
 }
 
 .sm_pheno <- function(path) {
   hdr <- .sm_header(path)
-  ch  <- .sm_characteristics(hdr)
   gsm <- .sm_field(hdr, "!Sample_geo_accession")
   ttl <- .sm_field(hdr, "!Sample_title")
   if (is.null(gsm) || is.null(ttl)) {
@@ -253,6 +276,7 @@ VROOM_BUF <- 8388608L    # 8 MB, about 9x the largest line seen
   }
   gsm <- gsm[[1]]; ttl <- ttl[[1]]
   stopifnot(length(gsm) == length(ttl))
+  ch <- .sm_characteristics(hdr, length(gsm))
   if (nrow(ch) && nrow(ch) != length(gsm)) {
     stop(basename(path), ": ", nrow(ch), " characteristic rows against ",
          length(gsm), " samples.", call. = FALSE)
