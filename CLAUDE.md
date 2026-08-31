@@ -30,7 +30,8 @@ prevent wrong-species errors.
 ## Current phase
 
 **Scripts 00–15 are all written and run. All four hypotheses are tested and none
-is supported.** Updated 2026-08-31.
+is supported. The BIM replication is UNBLOCKED and runs in SCAN-B (option 1).**
+Updated 2026-08-31.
 
 | Gate | Outcome | Note |
 |---|---|---|
@@ -57,16 +58,28 @@ Where the science stands, so that nothing is re-derived by accident:
   `Folate and 1-C` (Block B), `D MB2 DESCRIPTIVE log2_BCL2L1` (Block D), and **MCL1 in
   BrighTNess** (F1 — one gene, one cohort, I² 82%, Q p 0.0036). Chasing any of them is
   the fifth post-hoc hypothesis section 2 forbids.
-- **One live commitment, and it is BLOCKED:** the BIM replication declared in the Block C
-  note section 9 requires **both** instruments. mitoPPS does not exist in the three
-  neoadjuvant cohorts (amendment A1), so it cannot be run there as declared. See
-  `docs/2026-08-31_block_F1_result_H4_not_supported.md` section 9 — the options are
-  SCAN-B, deletion, or an explicitly-labelled non-replication.
+- **One live commitment, and it is now RUNNING:** the BIM replication declared in the
+  Block C note section 9. It requires **both** instruments, which blocked it in the
+  neoadjuvant cohorts (amendment A1). **Decided 2026-08-31: option 1** — run it in
+  SCAN-B, cohort **GSE202203** (n = 3,207, raw gene counts, so both instruments are
+  possible). Every parameter is fixed pre-data in
+  `docs/2026-08-31_scanb_bim_replication_declaration.md`. Read that before touching
+  scripts 16 or 17.
+  - **GSE96058 is the wrong SCAN-B deposit** — it ships log2(FPKM+0.1) only, no counts,
+    so A1 blocks it exactly as it blocks the neoadjuvant cohorts. Same for GSE81538.
+  - SCAN-B is fetched **for the BIM replication and nothing else**. GSE202203 carries
+    OS, RFI and treatment flags; scripts 16 and 17 do not read them. F2, F3 and
+    forkscale in SCAN-B are separate decisions with separate notes.
+  - **Script 17 section 2 is a hard gate**: the TCGA calibration under the reduced
+    SCAN-B covariate set. If it fails, nothing in SCAN-B is fitted.
 
-Next: the decision on the arm as a whole, and the BIM commitment. Plan section 15's
-well-formed-failure framing is now fully available and is what the evidence supports.
+Next: script 16 (fetch SCAN-B), then script 17 (the replication). Plan section 15's
+well-formed-failure framing is what the evidence supports, and the write-up proceeds
+once the replication resolves either way — the declaration's failure branch
+("reported as a TCGA-specific observation and dropped") is a publishable outcome, not
+a blocker.
 
-Do not build script 16/17/18 before that decision. **The two-way is not a fallback**
+**Script 18 is still not to be built.** **The two-way is not a fallback**
 (plan Block F1), and no fifth hypothesis is permitted.
 
 ## Workflow — "Option A" (do not deviate)
