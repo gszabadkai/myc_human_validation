@@ -65,14 +65,32 @@ the guard is the backstop, not the plan.
 
 ## Checksums
 
-Recorded on first download. Script 16 section 1 prints `md5` and `sha256` for
-all three files; paste them here after the first successful run so a silently
-changed re-download is visible.
+Downloaded and verified 2026-08-31. All three pass `gzip -t`. Script 16 section
+1 recomputes `md5` and `sha256` on every run, so a silently changed
+re-download is visible.
 
 ```
-GSE202203_RawCounts_gene_3207.tsv.gz              md5 <fill in>  sha256 <fill in>
-GSE202203-GPL11154_series_matrix.txt.gz           md5 <fill in>  sha256 <fill in>
-GSE202203-GPL18573_series_matrix.txt.gz           md5 <fill in>  sha256 <fill in>
+GSE202203_RawCounts_gene_3207.tsv.gz     214,227,990 bytes
+  md5     c4620ee5c20d82ff697ed3beccbd78ec
+  sha256  db38c17fad4b744a2a1ad93dbf957ea5bec3d645400fe1d3172bafe09f5c3709
+
+GSE202203-GPL11154_series_matrix.txt.gz      270,141 bytes   2,913 samples
+  md5     6758c933a90f1898352d357bcd21d87c
+  sha256  59613566126997b912878e9da78ba96760b376d150823c0d9e52e115436f1350
+
+GSE202203-GPL18573_series_matrix.txt.gz       47,209 bytes     294 samples
+  md5     d359544a1c90f59b782e0ee9e647656d
+  sha256  762b437c00935c91e3b1635a1acd07040c8a8d6d7f4d3ad6e56a568fd4442079
+```
+
+Shape verified on the files themselves, not assumed:
+
+```
+counts       3,208 header fields, 3,208 data fields (plain layout), 19,644 genes
+symbols      19,644 distinct - no duplicate collapse needed
+samples      2,913 + 294 = 3,207
+endpoints    BCL2L11, BCL2L1, BBC3, MYC all present (also MCL1, BAX, BID, BAK1)
+mtDNA        all 13 MT- protein-coding genes present
 ```
 
 ## Landmines
@@ -115,6 +133,29 @@ guard for each; none of these is visible in the output if the guard is removed.
    inside the value (`esr1 expression: log2(tpm+0.1): 5.97`), so the parsed
    value keeps the `log2(tpm+0.1): ` prefix. Both columns are forbidden and
    dropped, so this is never cleaned up.
+
+6. **The gene symbols are a 2014 vintage.** SCAN-B is annotated against UCSC
+   knownGenes downloaded 22 September 2014; MitoCarta 3.0 uses current HGNC
+   symbols. The ATP synthase subunits were renamed wholesale in 2018, so
+   **nineteen of the eighty-nine genes in `OXPHOS subunits` - the exposure - do
+   not match by name**, and coverage lands at 0.787 against a 0.80 floor.
+
+   The genes are all there under their 2014 names. Script 16 section 7.3
+   harmonises them through MitoCarta's own `Synonyms` column, forward direction
+   only, refusing ambiguous and colliding candidates - script 07 section 2's
+   map, applied to this matrix instead of TCGA's. Verified 2026-08-31: all 19
+   resolve, none ambiguous, none colliding, coverage 0.787 -> 1.000.
+
+   This is the landmine with the worst failure mode of the six. Accepting 70 of
+   89 without noticing would have left a Complex V with no F1 head and no
+   c-ring, still labelled "OXPHOS subunits", and nothing downstream would have
+   looked wrong.
+
+   The Felsher and Hallmark sets are not MitoCarta genes so their few renames
+   (`H2AX`, `POLR1G`, `VARS1` and a handful more) are **not** rescued - they sit
+   at 0.95-0.98, above the floor, and are reported by name. A general alias
+   source was deliberately not introduced: choosing one after seeing which genes
+   were missing is what the coverage floor exists to make unnecessary.
 
 ## The fence
 

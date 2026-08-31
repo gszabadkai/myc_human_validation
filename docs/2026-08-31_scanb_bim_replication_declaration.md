@@ -352,3 +352,93 @@ Both are written by Claude Code and run by the author in Positron, per Option A.
 **Written 2026-08-31, before any SCAN-B expression value was read.** The ordering
 is what makes this a replication rather than a description, and it is checkable
 in the git log.
+
+---
+
+# Addendum A - symbol vocabulary, added 2026-08-31, still pre-fit
+
+Added after the three files were downloaded and their symbol column read, and
+**before any expression value entered any model**. It is recorded as an
+addendum rather than folded into section 7 so the ordering stays checkable.
+
+## A.1 What was found
+
+SCAN-B is annotated against **UCSC knownGenes downloaded 22 September 2014**
+(series `!Sample_data_processing`). Human MitoCarta 3.0 (2020) carries current
+HGNC symbols. The ATP synthase subunits were renamed wholesale in 2018, so the
+two vocabularies disagree on **19 of the 89 genes in `OXPHOS subunits`** - which
+is the exposure of the declared model.
+
+```
+ATP5F1A <- ATP5A1    ATP5MC1 <- ATP5G1    ATP5PB  <- ATP5F1
+ATP5F1B <- ATP5B     ATP5MC2 <- ATP5G2    ATP5PD  <- ATP5H
+ATP5F1C <- ATP5C1    ATP5MC3 <- ATP5G3    ATP5PF  <- ATP5J
+ATP5F1D <- ATP5D     ATP5MD  <- USMG5     ATP5PO  <- ATP5O
+ATP5F1E <- ATP5E     ATP5ME  <- ATP5I     ATP5IF1 <- ATPIF1
+ATP5MPL <- C14orf2   ATP5MF  <- ATP5J2    ATP5MG  <- ATP5L
+DMAC2L  <- ATP5S
+```
+
+Unharmonised, `OXPHOS subunits` covers **0.787** here against 1.000 in TCGA, and
+section 11's coverage floor would have stopped the replication - for the wrong
+reason. The genes are all present under their 2014 names.
+
+The failure mode of *not* noticing is worse than the stop: 70 of 89 genes,
+still labelled `OXPHOS subunits`, is a Complex V with no F1 head and no c-ring.
+Nothing downstream would have looked wrong.
+
+## A.2 What is done about it, and why it is not an amendment
+
+Script 16 section 7.3 harmonises the declared sets to the SCAN-B vocabulary
+using **script 07 section 2's existing map**, applied to this matrix instead of
+TCGA's. This is the arm's own symbol-harmonisation step running in a second
+cohort, not a new decision - TCGA's sets went through exactly the same map. Not
+running it would be the deviation.
+
+Its properties are what make it safe:
+
+- the source is **MitoCarta's own curated `Synonyms` column** - not a guess, and
+  not a new annotation package introduced mid-arm;
+- it runs **forward only**, current symbol -> its listed alias. Script 07
+  documents why the reverse is dangerous: `COX1`/`COX2`/`COX3` resolve to the
+  prostaglandin synthases, injecting two abundant inflammatory genes into an
+  OXPHOS set, invisibly;
+- a candidate that is itself a current MitoCarta symbol for a different gene is
+  **refused**, and so is any symbol with more than one surviving candidate.
+  Ambiguity is left unresolved and reported by name.
+
+Verified on this matrix: **all 19 resolve, none ambiguous, no two map to the
+same row, coverage 0.787 -> 1.000.** Script 16 stops if two inputs ever collide
+onto one row, because that would double-weight a gene inside a pathway mean with
+nothing visible downstream.
+
+## A.3 What is deliberately NOT rescued
+
+The Felsher estimator and the Hallmark proliferation sets are not MitoCarta
+genes, so MitoCarta's synonyms cannot resolve their renames:
+
+```
+Felsher M-a (61)     0.951    missing POLR1G, VARS1, EEF1AKNMT
+PROLIF_DISJOINT      0.978    missing H2AX, H2AZ1, H2AZ2, H2BC12, PRP4K,
+PROLIF_STD           0.979            PTTG3P, TENT4A
+```
+
+All are above the 0.80 floor. They are **reported by name and left unresolved**.
+A general alias source (org.Hs.eg.db, limma's alias tables) would resolve them,
+and introducing one for this cohort only - chosen after seeing which genes were
+missing - is precisely the move the coverage floor exists to make unnecessary.
+
+This asymmetry is stated plainly because it is real: the exposure is harmonised
+and the covariates are not. The justification is that the harmonisation source
+was fixed by the arm in advance for MitoCarta sets and does not exist for the
+others, not that one mattered more than the other.
+
+## A.4 What this changes in the model
+
+Nothing. The gene sets are the same genes; only the strings differ. The
+declared model, the covariate mapping, the specifications, the null, the
+replication criteria and the failure branch are all unchanged.
+
+`symbol_map` and `symbol_report` are saved in `results/scanb_pheno.rds`, and
+**script 17 must apply `symbol_map` before scoring**. Coverage is reported both
+before and after harmonisation so the raw number is never lost.

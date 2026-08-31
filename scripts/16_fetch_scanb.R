@@ -714,10 +714,56 @@ if (length(mt_found) < 13L) {
           "skips it in TCGA too.")
 }
 
-# --- 7.3 the sets script 17 will score --------------------------------------
-# REPORTED here, ENFORCED in 17. This script builds no model, so a low fraction
-# is not a reason to discard a 200 MB download - but it is something the author
-# should see before spending time on script 17.
+# --- 7.3 symbol harmonisation to the SCAN-B vocabulary ----------------------
+# THIS SECTION IS NOT OPTIONAL AND IT IS NOT A CONVENIENCE.
+#
+# SCAN-B is annotated against UCSC knownGenes downloaded 22 SEPTEMBER 2014.
+# Human MitoCarta 3.0 (2020) carries CURRENT HGNC symbols. The ATP synthase
+# subunits were renamed wholesale in 2018, so the two vocabularies disagree on
+# nineteen of the eighty-nine genes in `OXPHOS subunits` - which is the
+# EXPOSURE of the declared model:
+#
+#   ATP5F1A <- ATP5A1     ATP5MC1 <- ATP5G1     ATP5PB  <- ATP5F1
+#   ATP5F1B <- ATP5B      ATP5MC2 <- ATP5G2     ATP5PD  <- ATP5H
+#   ATP5F1C <- ATP5C1     ATP5MC3 <- ATP5G3     ATP5PF  <- ATP5J
+#   ATP5F1D <- ATP5D      ATP5MD  <- USMG5      ATP5PO  <- ATP5O
+#   ATP5F1E <- ATP5E      ATP5ME  <- ATP5I      ATP5IF1 <- ATPIF1
+#   ATP5MPL <- C14orf2    ATP5MF  <- ATP5J2     ATP5MG  <- ATP5L
+#   DMAC2L  <- ATP5S
+#
+# Unharmonised, `OXPHOS subunits` covers 0.787 of its genes here against 1.000
+# in TCGA, and script 17's coverage floor would stop the replication. It would
+# stop for the WRONG REASON: the genes are all present, under the names they
+# had in 2014. Silently accepting 70 of 89 would be worse still - a Complex V
+# with no F1 head and no c-ring is a different exposure wearing the same label.
+#
+# The map is script 07 section 2's, applied to this matrix instead of TCGA's,
+# and reproduced here rather than sourced because script 07 is a pipeline script
+# with side effects, not a function library. Its properties are what make it
+# safe, and they are worth restating:
+#
+#   - the source is MitoCarta's own curated `Synonyms` column, not a guess and
+#     not a new annotation package introduced mid-arm;
+#   - it runs FORWARD only, current symbol -> its listed alias. The reverse
+#     direction is dangerous and script 07 documents why: COX1/COX2/COX3
+#     resolve to the PROSTAGLANDIN SYNTHASES, injecting two abundant
+#     inflammatory genes into an OXPHOS set, invisibly;
+#   - a candidate that is itself a current MitoCarta symbol for a different
+#     gene is refused, and so is any symbol with more than one surviving
+#     candidate. Ambiguity is left UNRESOLVED and reported by name.
+#
+# Verified on this matrix 2026-08-31: all 19 resolve, none ambiguous, no two
+# map to the same target, and coverage goes 0.787 -> 1.000.
+#
+# The Felsher and Hallmark sets are NOT MitoCarta genes, so MitoCarta's
+# synonyms cannot resolve their handful of renames (H2AX, POLR1G, VARS1 and a
+# few more). They sit at 0.95-0.98, comfortably above the floor, and they are
+# REPORTED BY NAME rather than rescued with a general alias source. Introducing
+# one for this cohort only would be a new instrument, chosen after seeing which
+# genes were missing, and that is exactly the move the coverage floor exists to
+# make unnecessary.
+message("\n7.3 symbol harmonisation to the SCAN-B vocabulary")
+
 gs       <- readRDS(file.path(DIR_RESULTS, "tcga_brca_mito_scores.rds"))
 arm_sets <- gs$arm_sets
 cov_sets <- gs$covariate_sets
@@ -738,25 +784,110 @@ sets <- c(arm_sets["OXPHOS subunits"],
           cov_sets[c("PROLIF_DISJOINT", "PROLIF_STD")],
           list(`Felsher M-a (stripped 61)` = felsher_ma))
 
+mitocarta_background <- suppressWarnings(readxl::read_xls(PATH_MITOCARTA, sheet = 3))
+stopifnot(all(c("Symbol", "Synonyms") %in% colnames(mitocarta_background)))
+
+MATRIX_SYMBOLS <- rownames(mat_vst)
+MC_SYMBOLS     <- unique(mitocarta_background$Symbol)
+
+.syn_map <- local({
+  syn <- strsplit(ifelse(is.na(mitocarta_background$Synonyms), "",
+                         mitocarta_background$Synonyms), "|", fixed = TRUE)
+  tibble::tibble(symbol = rep(mitocarta_background$Symbol, lengths(syn)),
+                 alias  = unlist(syn)) %>%
+    dplyr::filter(!is.na(alias), alias != "", alias != symbol) %>%
+    dplyr::distinct()
+})
+
+# ONE map over the union of every symbol the declared model uses, applied to
+# each set separately - script 07's rule. Building it per set would let the
+# setdiff() guard below see a different "already in the set" universe each
+# time.
+.build_symbol_map <- function(genes) {
+  genes   <- sort(unique(genes[!is.na(genes) & genes != ""]))
+  present <- genes %in% MATRIX_SYMBOLS
+  out     <- stats::setNames(genes, genes)
+  status  <- ifelse(present, "matched", "unresolved")
+
+  for (i in which(!present)) {
+    g    <- genes[[i]]
+    cand <- .syn_map$alias[.syn_map$symbol == g]
+    cand <- cand[cand %in% MATRIX_SYMBOLS]
+    cand <- cand[!(cand %in% MC_SYMBOLS & cand != g)]
+    cand <- setdiff(cand, genes)
+    if (length(cand) == 1L) {
+      out[[g]]    <- cand
+      status[[i]] <- "resolved"
+    } else if (length(cand) > 1L) {
+      status[[i]] <- "ambiguous"
+    }
+  }
+  list(map = out,
+       report = tibble::tibble(input_symbol = genes, status = status,
+                               resolved_to = unname(out[genes])))
+}
+
+bm           <- .build_symbol_map(unlist(sets, use.names = FALSE))
+symbol_map   <- bm$map
+symbol_report <- bm$report
+print(table(symbol_report$status))
+
+resolved <- symbol_report[symbol_report$status == "resolved", ]
+if (nrow(resolved)) {
+  message("   ", nrow(resolved), " symbol(s) resolved through MitoCarta synonyms:")
+  resolved %>% as.data.frame() %>% print(row.names = FALSE)
+}
+ambig <- symbol_report$input_symbol[symbol_report$status == "ambiguous"]
+if (length(ambig)) {
+  message("   AMBIGUOUS, left unresolved: ", paste(ambig, collapse = ", "))
+}
+
+# Two symbols must never resolve onto the same row - that would double-weight a
+# gene inside a pathway mean and there would be nothing to see downstream.
+mapped_all <- unname(symbol_map)
+mapped_in  <- mapped_all[mapped_all %in% MATRIX_SYMBOLS]
+if (anyDuplicated(mapped_in)) {
+  stop("the symbol map sends two inputs to the same matrix row: ",
+       paste(unique(mapped_in[duplicated(mapped_in)]), collapse = ", "),
+       call. = FALSE)
+}
+
+.remap <- function(g) unname(symbol_map[g])
+
+# --- 7.4 the sets script 17 will score, before and after harmonisation ------
+# REPORTED here, ENFORCED in 17. This script builds no model, so a low fraction
+# is not a reason to discard a 200 MB download - but it is something the author
+# must see before spending time on script 17.
 cov_tab <- dplyr::bind_rows(lapply(names(sets), function(sn) {
   g <- unique(sets[[sn]])
+  h <- .remap(g)
   tibble::tibble(set = sn, n_set = length(g),
-                 n_present = sum(g %in% rownames(mat_vst)),
-                 frac = sum(g %in% rownames(mat_vst)) / length(g))
+                 n_raw       = sum(g %in% MATRIX_SYMBOLS),
+                 frac_raw    = sum(g %in% MATRIX_SYMBOLS) / length(g),
+                 n_present   = sum(h %in% MATRIX_SYMBOLS),
+                 frac        = sum(h %in% MATRIX_SYMBOLS) / length(g),
+                 missing     = paste(g[!h %in% MATRIX_SYMBOLS], collapse = ", "))
 }))
-cov_tab %>% as.data.frame() %>% print(row.names = FALSE)
+cov_tab %>% dplyr::select(-"missing") %>% as.data.frame() %>%
+  print(row.names = FALSE)
+for (i in seq_len(nrow(cov_tab))) {
+  if (nzchar(cov_tab$missing[i])) {
+    message("   ", cov_tab$set[i], " still missing: ", cov_tab$missing[i])
+  }
+}
 
 low <- cov_tab$set[cov_tab$frac < MIN_SET_FRAC]
 if (length(low)) {
-  warning("set(s) below the ", MIN_SET_FRAC, " coverage floor in SCAN-B: ",
-          paste(low, collapse = ", "),
+  warning("set(s) below the ", MIN_SET_FRAC, " coverage floor in SCAN-B ",
+          "EVEN AFTER harmonisation: ", paste(low, collapse = ", "),
           ". Script 17 enforces this; decide before running it.",
           call. = FALSE)
 } else {
-  message("   all sets at or above the ", MIN_SET_FRAC, " coverage floor")
+  message("   all sets at or above the ", MIN_SET_FRAC,
+          " coverage floor after harmonisation")
 }
 
-# --- 7.4 what the declared model will actually have --------------------------
+# --- 7.5 what the declared model will actually have --------------------------
 # Complete cases on what the primary specification needs. Reported, not applied
 # - the matrices stay whole, because GSVA scores the cohort in one run and only
 # the MODEL takes complete cases (declaration section 11).
@@ -788,6 +919,12 @@ prov <- list(
   join        = sprintf("'%s' under '%s', %.1f%% matched", key$col, key$tf,
                         100 * key$score),
   pam50       = "'Unclassified' coded NA; 'Normal' kept as a level",
+  symbols     = paste("SCAN-B is annotated against UCSC knownGenes 2014 and",
+                      "carries pre-2018 HGNC symbols. The declared sets are",
+                      "harmonised to it through MitoCarta's own Synonyms",
+                      "column, forward direction only (script 07 section 2).",
+                      "symbol_map and symbol_report carry the result; script 17",
+                      "MUST apply symbol_map before scoring."),
   duplicates  = sprintf("%d duplicate case token(s) removed", dup_case),
   forbidden   = SCANB_FORBIDDEN,
   fence       = paste("survival, treatment and ESR1/ESR2 columns are dropped;",
@@ -818,7 +955,8 @@ saveRDS(list(mat = mat_vst, scale = "log_vst",
              consumer = "GSVA, kcdf = Gaussian", pheno = pheno, prov = prov),
         PATH_VST)
 saveRDS(list(pheno = pheno, prov = prov, coverage = cov_tab, critical = crit,
-             size_factors = sf, mt_found = mt_found), PATH_PHENO)
+             size_factors = sf, mt_found = mt_found,
+             symbol_map = symbol_map, symbol_report = symbol_report), PATH_PHENO)
 
 readr::write_csv(pheno,   file.path(DIR_TABLES, "scanb_pheno.csv"))
 readr::write_csv(cov_tab, file.path(DIR_TABLES, "scanb_coverage.csv"))
@@ -868,9 +1006,23 @@ if (FALSE) {
   table(p$pheno$platform, p$pheno$PAM50)
 
   # --- coverage, and the join ----------------------------------------------
-  p$coverage %>% as.data.frame() %>% print(row.names = FALSE)
+  p$coverage %>% dplyr::select(-missing) %>% as.data.frame() %>%
+    print(row.names = FALSE)
   p$prov$join
   p$prov$deviation
+
+  # --- the symbol map, which is the thing most likely to be wrong ----------
+  # Every "resolved" row should be a historical HGNC rename you can recognise.
+  # If any of them is not, stop and look before script 17 scores anything.
+  table(p$symbol_report$status)
+  p$symbol_report %>% dplyr::filter(status == "resolved") %>%
+    as.data.frame() %>% print(row.names = FALSE)
+
+  # The exposure, gene by gene, as script 17 will actually see it.
+  ox <- unique(readRDS(file.path(DIR_RESULTS,
+        "tcga_brca_mito_scores.rds"))$arm_sets[["OXPHOS subunits"]])
+  data.frame(mitocarta = ox, in_scanb_as = unname(p$symbol_map[ox]),
+             found = unname(p$symbol_map[ox]) %in% rownames(v$mat))
 
   # --- the fence -----------------------------------------------------------
   # Should be character(0). If it is not, something re-added an outcome column.
