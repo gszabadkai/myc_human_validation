@@ -151,11 +151,29 @@ guard for each; none of these is visible in the output if the guard is removed.
    c-ring, still labelled "OXPHOS subunits", and nothing downstream would have
    looked wrong.
 
-   The Felsher and Hallmark sets are not MitoCarta genes so their few renames
-   (`H2AX`, `POLR1G`, `VARS1` and a handful more) are **not** rescued - they sit
-   at 0.95-0.98, above the floor, and are reported by name. A general alias
-   source was deliberately not introduced: choosing one after seeing which genes
-   were missing is what the coverage floor exists to make unnecessary.
+   **Result of the run, 2026-08-31.** 27 symbols resolved, none ambiguous, none
+   colliding. MitoCarta's sheet 3 is the whole 19,247-gene human background, so
+   its `Synonyms` column reaches the Felsher and Hallmark renames too
+   (`H2AX -> H2AFX`, `POLR1G -> CD3EAP`, `VARS1 -> VARS`, and five more) - the
+   declaration's addendum A.3 predicted otherwise and is corrected in place.
+
+   ```
+                        raw   harmonised   still missing
+   OXPHOS subunits     0.775     0.989     COX8C
+   PROLIF_DISJOINT     0.978     0.994     PRP4K, PTTG3P
+   PROLIF_STD          0.979     0.994     PRP4K, PTTG3P
+   Felsher M-a (61)    0.951     1.000     -
+   ```
+
+   `COX8C` is testis-specific, `PTTG3P` is a pseudogene. Three unresolved
+   symbols are left alone and reported by name.
+
+   The guard that refuses a candidate which is itself a current symbol is not
+   theoretical. `POLR1G`'s synonyms are `ASE-1|ASE1|CAST|CD3EAP|PAF49|RPA34`,
+   and two of them are in this matrix: `CD3EAP`, the genuine former symbol, and
+   **`CAST`, calpastatin - a different gene entirely**. The guard removed `CAST`
+   and left `CD3EAP` unique. Without it the MYC estimator would have gained
+   calpastatin and lost `POLR1G`, invisibly.
 
 ## The fence
 

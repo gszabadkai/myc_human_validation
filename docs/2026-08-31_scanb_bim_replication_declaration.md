@@ -414,6 +414,59 @@ nothing visible downstream.
 
 ## A.3 What is deliberately NOT rescued
 
+> **CORRECTED 2026-08-31, after script 16 ran. The premise below is wrong.**
+> I wrote that MitoCarta's synonyms "cannot resolve" the Felsher and Hallmark
+> renames because those genes are not MitoCarta genes. They can, and they did.
+> **MitoCarta 3.0's sheet 3 is the whole 19,247-gene human background**, not the
+> 1,136 mitochondrial genes, and it carries a `Synonyms` column for every gene
+> in it. The map is therefore a general HGNC alias source already, and the
+> section below argues against introducing something the arm has had since
+> 2026-08-28.
+>
+> What actually happened: **27 symbols resolved, not 19**, all of them genuine
+> historical renames.
+>
+> ```
+> EEF1AKNMT -> METTL13    H2AZ2  -> H2AFV      TENT4A -> PAPD7
+> H2AX      -> H2AFX      H2BC12 -> HIST1H2BK  VARS1  -> VARS
+> H2AZ1     -> H2AFZ      POLR1G -> CD3EAP
+> ```
+>
+> Final coverage, after harmonisation and the low-count filter:
+>
+> ```
+>                            raw     harmonised   still missing
+> OXPHOS subunits           0.775      0.989      COX8C
+> PROLIF_DISJOINT           0.978      0.994      PRP4K, PTTG3P
+> PROLIF_STD                0.979      0.994      PRP4K, PTTG3P
+> Felsher M-a (61)          0.951      1.000      -
+> ```
+>
+> `COX8C` is testis-specific and `PTTG3P` is a pseudogene; neither is expected
+> in breast at the filter's threshold. Three unresolved, none ambiguous.
+>
+> **The discipline argument survives intact, and is stronger than the version
+> below.** The map was fixed on 2026-08-28 in script 07 section 2, built over
+> the union of all four sets at once, and applied uniformly. Nothing was chosen
+> after seeing which genes were missing - which is what the paragraph below was
+> worried about. The asymmetry it anticipated (exposure harmonised, covariates
+> not) **did not occur**: all four sets went through the same map.
+>
+> **One concrete instance of why the guard matters**, worth recording because it
+> is the failure this map is built to prevent. `POLR1G`'s MitoCarta synonyms are
+> `ASE-1 | ASE1 | CAST | CD3EAP | PAF49 | RPA34`. Two of those are in the SCAN-B
+> matrix: `CD3EAP`, the genuine former symbol, and **`CAST`, which is
+> calpastatin - a real and entirely different gene**. The rule that refuses a
+> candidate which is itself a current symbol removed `CAST` and left `CD3EAP`
+> unique. Without it the MYC estimator would have silently gained calpastatin
+> and lost `POLR1G`.
+>
+> The section below is kept as written, because the reasoning in its last
+> paragraph is still the right reasoning for any gene the map genuinely cannot
+> reach - there were three, and they were left alone.
+
+
+
 The Felsher estimator and the Hallmark proliferation sets are not MitoCarta
 genes, so MitoCarta's synonyms cannot resolve their renames:
 
