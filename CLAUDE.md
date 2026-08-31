@@ -29,9 +29,10 @@ prevent wrong-species errors.
 
 ## Current phase
 
-**Scripts 00–15 are all written and run. All four hypotheses are tested and none
-is supported. The BIM replication is UNBLOCKED and runs in SCAN-B (option 1).**
-Updated 2026-08-31.
+**Scripts 00–17 are all written and run. All four hypotheses are tested and none
+is supported. The BIM replication ran in SCAN-B and FAILED, so the one surviving
+finding is TCGA-specific and dropped. The arm is analytically complete — there
+is no further analysis.** Updated 2026-08-31.
 
 | Gate | Outcome | Note |
 |---|---|---|
@@ -49,36 +50,41 @@ Where the science stands, so that nothing is re-derived by accident:
   fails, and it fails as a null rather than in the informative direction.
 - **Three of four falsification criteria are met.** The fourth is unmet only because
   criterion 4 demands an active *inversion*, which is a stronger claim than a null.
-- **One finding survives, in TCGA, on both instruments:** `MYC x OXPHOS` associates with
-  **lower BCL-XL and higher BIM**, PUMA unmoved, no compensating amplification. BIM is
-  pre-specified in the mouse arm (`myc_mouse/scripts/44`), not a fishing result. In
-  DepMap it is **UNRESOLVED** — read the Block G note section 5.1 before touching it.
-  **No claim of breast-specificity is licensed.**
+- **No finding survives replication.** `MYC x OXPHOS` associated with **lower BCL-XL
+  and higher BIM** in TCGA on both instruments, PUMA unmoved. BIM was pre-specified in
+  the mouse arm (`myc_mouse/scripts/44`), not a fishing result — and it **failed its
+  pre-registered replication in SCAN-B with the sign reversed**, so it is
+  TCGA-specific and dropped. In DepMap it was already **UNRESOLVED** — read the Block G
+  note section 5.1 before touching it. **BCL-XL down is the one direction consistent
+  across cohorts; it is not claimed and never was a hypothesis.**
 - **Four results reported and deliberately NOT pursued:** `Glycine metabolism` (Block C),
   `Folate and 1-C` (Block B), `D MB2 DESCRIPTIVE log2_BCL2L1` (Block D), and **MCL1 in
   BrighTNess** (F1 — one gene, one cohort, I² 82%, Q p 0.0036). Chasing any of them is
   the fifth post-hoc hypothesis section 2 forbids.
-- **One live commitment, and it is now RUNNING:** the BIM replication declared in the
-  Block C note section 9. It requires **both** instruments, which blocked it in the
-  neoadjuvant cohorts (amendment A1). **Decided 2026-08-31: option 1** — run it in
-  SCAN-B, cohort **GSE202203** (n = 3,207, raw gene counts, so both instruments are
-  possible). Every parameter is fixed pre-data in
-  `docs/2026-08-31_scanb_bim_replication_declaration.md`. Read that before touching
-  scripts 16 or 17.
-  - **GSE96058 is the wrong SCAN-B deposit** — it ships log2(FPKM+0.1) only, no counts,
-    so A1 blocks it exactly as it blocks the neoadjuvant cohorts. Same for GSE81538.
-  - SCAN-B is fetched **for the BIM replication and nothing else**. GSE202203 carries
-    OS, RFI and treatment flags; scripts 16 and 17 do not read them. F2, F3 and
+- **The one live commitment is DISCHARGED, and it failed.** The BIM replication
+  declared in the Block C note section 9 ran in **SCAN-B, GSE202203** (n = 3,143 of
+  3,207), on both co-primary instruments. `BCL2L11` was predicted POSITIVE; it is
+  **negative on both instruments** (GSVA −0.036 p 0.019; mitoPPS −0.033 p 0.037),
+  stable across all four specifications, and more extreme than 99.5% / 99.95% of
+  expression-matched null sets — so the reversal is specific, not a scale artefact.
+  See `docs/2026-08-31_scanb_bim_replication_result.md`.
+  - **The covariate reduction is ruled out.** Script 17's hard gate refit the TCGA
+    limbs under the reduced SCAN-B covariate set on the same 938 and it cost ~10% of
+    the estimate, not the sign. The gate passed on a condition fixed before either
+    number existed.
+  - **The BIM finding is now TCGA-specific and DROPPED**, exactly as the declaration
+    provides. *"No further variants are tried"* — not another cohort, not another
+    covariate set, not another estimator, not a subtype stratum.
+  - **It does not close falsification criterion 4**, which names H4 and
+    chemoresistance. Three of four criteria met, unchanged.
+  - **GSE96058 is the wrong SCAN-B deposit** — log2(FPKM+0.1) only, no counts, so A1
+    blocks it exactly as it blocks the neoadjuvant cohorts. Same for GSE81538.
+  - SCAN-B was fetched **for the BIM replication and nothing else**. GSE202203 carries
+    OS, RFI and treatment flags; they are not in `results/scanb_pheno.rds`. F2, F3 and
     forkscale in SCAN-B are separate decisions with separate notes.
-  - **Script 17 section 2 is a hard gate**: the TCGA calibration under the reduced
-    SCAN-B covariate set. If it fails, nothing in SCAN-B is fitted.
 
-Next: run script 17, then the result note. **Scripts 16 and 17 are written; 16
-is run** (SCAN-B built: 18,153 genes x 3,207 samples, `results/scanb_*.rds`). Plan section 15's
-well-formed-failure framing is what the evidence supports, and the write-up proceeds
-once the replication resolves either way — the declaration's failure branch
-("reported as a TCGA-specific observation and dropped") is a publishable outcome, not
-a blocker.
+Next: **the write-up**, on plan section 15's framing, which the evidence now supports
+completely. There is no remaining analysis.
 
 Two facts from the script 16 run that are easy to re-inherit wrongly:
 
