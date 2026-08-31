@@ -73,11 +73,23 @@ Where the science stands, so that nothing is re-derived by accident:
   - **Script 17 section 2 is a hard gate**: the TCGA calibration under the reduced
     SCAN-B covariate set. If it fails, nothing in SCAN-B is fitted.
 
-Next: script 16 (fetch SCAN-B), then script 17 (the replication). Plan section 15's
+Next: run script 17, then the result note. **Scripts 16 and 17 are written; 16
+is run** (SCAN-B built: 18,153 genes x 3,207 samples, `results/scanb_*.rds`). Plan section 15's
 well-formed-failure framing is what the evidence supports, and the write-up proceeds
 once the replication resolves either way — the declaration's failure branch
 ("reported as a TCGA-specific observation and dropped") is a publishable outcome, not
 a blocker.
+
+Two facts from the script 16 run that are easy to re-inherit wrongly:
+
+- **SCAN-B's symbols are a 2014 UCSC vintage.** 19 of the 89 `OXPHOS subunits`
+  genes are pre-2018 ATP synthase names, and unharmonised the exposure covers
+  0.775. Script 07 section 2's map fixes it (0.989); script 16 saves
+  `symbol_map` and script 17 rebuilds it over the wider MitoCarta universe and
+  asserts agreement. **Never score SCAN-B without it.**
+- **The endpoints are `log2` of the LINEAR matrix, not the VST**, because that
+  is what script 08 did in TCGA. A replication that changes the endpoint's
+  scale is not a replication.
 
 **Script 18 is still not to be built.** **The two-way is not a fallback**
 (plan Block F1), and no fifth hypothesis is permitted.
